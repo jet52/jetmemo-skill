@@ -48,17 +48,29 @@ Use the paragraph symbol with a nonbreaking space:
 ¶¶ 6-8
 ```
 
+## Citation Precision
+
+All citations — case law, record, statutory — should be as precise as possible:
+
+- **Record citations:** Always include pinpoint page when available: `(R45:12)` not just `(R45)`. Include paragraph when citing a specific finding: `(R45:12:¶15)`.
+- **Case citations:** Always include pinpoint paragraph: `2024 ND 156, ¶ 12` not just `2024 ND 156`.
+- **Short identifying quotes:** When a fact or holding could be ambiguous, include a short quote (≤ 15 words) to anchor the citation: `The district court found "no credible evidence of changed circumstances." (R36:4)`.
+- **Brief page citations:** When attributing an argument to a party, cite the brief page: `Appellant argues the statute is ambiguous. (Appellant's Br. at 14.)` Use the format `(Appellant's Br. at ##)` or `(Appellee's Br. at ##)`.
+
 ## Tone and Voice
 
 - **Neutral, analytical tone** throughout
 - Present both sides fairly before offering assessment
-- Recommendations should be clearly stated but appropriately hedged
+- When `recommend_mode` is enabled, recommendations should be clearly stated but appropriately hedged
+- When `recommend_mode` is disabled (default), present both sides' strongest positions without stating a preferred outcome
 - Use **"the Court"** when referring to the ND Supreme Court
 - Use **"the district court"** for the lower court
-- Do not use "I" or "we" — write in the third person or use passive voice for recommendations ("The Court should affirm...")
+- Do not use "I" or "we" — write in the third person or use passive voice for recommendations (e.g., "The Court should affirm...")
 - Avoid legalese: no "herein," "wherefore," "aforementioned," "said" as a pronoun
 - Active voice unless passive genuinely improves readability
 - Use the Oxford comma
+- In writ proceedings, use **"petitioner"** and **"respondent"** instead of "appellant" and "appellee"
+- Use **"the petition"** and **"the response"** instead of "the opening brief" and "the appellee's brief" in writ proceedings
 
 ## Standards of Review
 
