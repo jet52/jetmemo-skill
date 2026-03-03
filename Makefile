@@ -18,6 +18,7 @@ test:
 	@test -f skill/SKILL.md || (echo "FAIL: skill/SKILL.md missing" && exit 1)
 	@test -d skill/references || (echo "FAIL: skill/references/ missing" && exit 1)
 	@test -d skill/scripts || (echo "FAIL: skill/scripts/ missing" && exit 1)
+	@test -f skill/scripts/splitmarks.py || (echo "FAIL: skill/scripts/splitmarks.py missing" && exit 1)
 	@test -f install.sh || (echo "FAIL: install.sh missing" && exit 1)
 	@test -f README.md || (echo "FAIL: README.md missing" && exit 1)
 	@echo "All checks passed."

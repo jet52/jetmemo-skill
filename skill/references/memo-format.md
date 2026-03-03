@@ -16,8 +16,9 @@
 - **{Document Description}** ({record_cite}) - Brief explanation of significance
 [4-8 items total]
 
-[¶1] {Opening paragraph: summarize the case in 2-3 sentences, identify all issues
-on appeal, and state the recommendation. **Bold the recommendation sentence.**}
+[¶1] {Opening paragraph: summarize the case in 2-3 sentences and identify all
+issues on appeal. If recommend_mode, state the recommendation and **bold the
+recommendation sentence.** Otherwise, state the central question or tension.}
 
 ## BACKGROUND
 
@@ -51,8 +52,9 @@ on appeal, and state the recommendation. **Bold the recommendation sentence.**}
 
 ## CONCLUSION
 
-[¶last] {Restate recommendation. **Bold the recommendation sentence.**
-Briefly summarize the key reasons.}
+[¶last] {If recommend_mode: Restate recommendation. **Bold the recommendation
+sentence.** Briefly summarize the key reasons. Otherwise: Summarize the key
+analytical considerations for each issue without stating a preferred outcome.}
 ```
 
 ## Formatting Rules
@@ -68,10 +70,17 @@ Briefly summarize the key reasons.}
 - Issue headings use **Roman numerals**: `## I.`, `## II.`, `## III.`
 - Sub-arguments use **letters**: `### A.`, `### B.`, `### C.`
 
-### Recommendations
+### Recommendations (recommend_mode only)
+When `recommend_mode` is enabled:
 - State recommendation in [¶1] — **bold** the sentence
 - Restate recommendation in CONCLUSION — **bold** the sentence
 - Use language like: "**The Court should affirm...**" or "**The Court should reverse...**"
+
+When `recommend_mode` is disabled (default):
+- Do NOT state a recommended disposition
+- End analysis with both sides' strongest positions
+- ¶1 should identify the central question, not a conclusion
+- CONCLUSION should summarize the analytical framework, not a result
 
 ### Content Requirements
 
@@ -79,17 +88,62 @@ Briefly summarize the key reasons.}
 - 4-8 key documents the justices should have at hand
 - Each with record citation and brief description of significance
 
+##### Exhibit Reference (when applicable)
+If the case involves contested exhibits, add after Quick Reference:
+
+```
+## Key Exhibits
+
+| Exhibit | Record Cite | Appellant's Claim | Appellee's Claim |
+|---------|-------------|-------------------|------------------|
+| Exhibit A | (R12:45) | Shows X | Shows Y |
+```
+
+Include only exhibits where the parties disagree about significance, or that are central to the disposition. Omit if fewer than 2 contested exhibits.
+
 #### BACKGROUND
 - Every factual assertion must have a record citation: (R##), (R##:page), (R##:page:¶para)
 - Include both factual and procedural history
 - Chronological order is typical
 
+##### Disputed Facts
+When Agent analysis reveals factual disputes, note them inline in BACKGROUND using this pattern:
+
+```
+[¶N] The parties dispute [topic]. Appellant contends [version] (R##:page), while
+Appellee asserts [version] (R##:page). The district court found [resolution if any]
+(R##:page).
+```
+
+Do not create a separate "disputed facts" section — weave the disputes into the narrative where they naturally arise.
+
 #### Issue Sections
 Each must include:
-1. **Standard of review** — with specific case authority from the briefs
-2. **Appellant's arguments** — with citations to briefs and record
-3. **Appellee's arguments** — with citations to briefs and record
-4. **Analysis** — neutral assessment, then recommendation
+1. **Preservation** — whether the issue was preserved below, with record citation to the objection/motion. If disputed, note both sides' positions. If unpreserved, note the applicable standard (plain error, etc.). May be omitted when preservation is clearly not at issue (e.g., pure legal questions raised in dispositive motions).
+2. **Standard of review** — with specific case authority from the briefs
+3. **Appellant's arguments** — with citations to briefs and record
+4. **Appellee's arguments** — with citations to briefs and record
+5. **Analysis** — strongest argument for the district court's ruling, then strongest counterargument, then assessment. If `recommend_mode`, add recommendation.
+
+Template:
+
+```
+## I. {Issue Statement}
+
+[¶N] **Preservation:** {Whether this issue was preserved below, with record
+citation to the objection/motion. If disputed, note both sides' positions.
+If unpreserved, note the applicable standard (plain error, etc.).}
+
+[¶N+1] **Standard of review:** {Standard with case authority.}
+
+[¶N+2] {Appellant's arguments with citations to briefs and record.}
+
+[¶N+3] {Appellee's arguments with citations to briefs and record.}
+
+[¶N+4] **Analysis:** {Strongest argument for the district court's ruling.
+Then the strongest counterargument. Then assessment. If recommend_mode,
+state recommended disposition.}
+```
 
 #### CONCLUSION
 - 1-2 paragraphs maximum

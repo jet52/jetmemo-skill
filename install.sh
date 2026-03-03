@@ -18,10 +18,9 @@ echo "Installed to $INSTALL_DIR"
 # Check external dependencies
 WARNINGS=0
 
-if ! command -v splitmarks &>/dev/null && [ ! -x "$HOME/bin/splitmarks" ]; then
-    echo "WARNING: splitmarks not found in PATH or ~/bin/splitmarks"
-    echo "  The bench-memo skill uses splitmarks to split PDF packets."
-    echo "  Install from: https://github.com/jet52/splitmarks"
+if ! python3 -c "import pypdf" &>/dev/null 2>&1; then
+    echo "WARNING: pypdf Python package not found"
+    echo "  Install with: pip install pypdf"
     WARNINGS=$((WARNINGS + 1))
 fi
 

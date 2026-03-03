@@ -18,7 +18,9 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | Style reference        | `~/.claude/skills/bench-memo/references/style-spec.md`    |
 | Memo format reference  | `~/.claude/skills/bench-memo/references/memo-format.md`   |
 | Verification script    | `~/.claude/skills/bench-memo/scripts/verify_citations.py` |
-| splitmarks             | `~/bin/splitmarks`                                        |
+| splitmarks             | `~/.claude/skills/bench-memo/scripts/splitmarks.py`       |
+
+> **Dependency:** splitmarks.py requires `pypdf`. Install with `pip install pypdf`.
 
 ### ~/refs directory layout
 
@@ -58,20 +60,25 @@ Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
    | `notice-of-appeal` | "Notice of Appeal"                                                  |
    | `order`            | District court order, judgment, findings                            |
    | `transcript`       | Hearing or trial transcript                                         |
+   | `writ-petition`    | "Petition for Supervisory Writ", "Application for Writ", "Petition for Writ of Habeas Corpus" |
+   | `writ-response`    | "Response to Petition", response filed by opposing party in writ proceeding |
+   | `writ-reply`       | "Reply" filed by petitioner in writ proceeding                      |
    | `other`            | Anything else                                                       |
+
+   > **Writ proceedings:** If the case is a writ proceeding, use "petitioner/respondent" terminology throughout instead of "appellant/appellee." Agent A handles the petition (or appellant brief), Agent B handles the response (or appellee brief).
 
 3. **Split large PDFs down to individual record items.** For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
-   ~/bin/splitmarks record.pdf --dry-run -vv   # preview bookmark tree
-   ~/bin/splitmarks record.pdf -o .split_records --no-clobber -v  # first pass
+   python ~/.claude/skills/bench-memo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
+   python ~/.claude/skills/bench-memo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v  # first pass
    ```
 
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 
    ```bash
-   ~/bin/splitmarks .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
-   ~/bin/splitmarks .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v  # split again
+   python ~/.claude/skills/bench-memo/scripts/splitmarks.py .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
+   python ~/.claude/skills/bench-memo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v  # split again
    ```
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
@@ -79,6 +86,8 @@ Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
 4. If **no PDFs** found, ask the user. If many files or ambiguous, confirm with the user.
 
 5. **Build a manifest:** `{path, type, page_count}` for every document. Track this manifest for all subsequent steps.
+
+6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). This flag controls whether the memo includes a recommended disposition for each issue.
 
 ### Step 1: Read References and Extract Text
 
@@ -161,6 +170,23 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > **4. Key Documents for Quick Reference**
 > 4-8 important documents with record citations and brief descriptions.
 >
+> **5. Exhibit & Key Evidence Index**
+> For each exhibit or key piece of evidence referenced:
+> - Exhibit identifier and record citation (pinpoint page)
+> - What the appellant/petitioner claims it proves
+> - Short identifying quote (≤ 25 words) from the brief where it is discussed
+>
+> **6. Statutory Interpretation**
+> If any issue involves interpreting a statute, rule, or regulation:
+> - Which provision and the specific text at issue
+> - What interpretation the appellant/petitioner advocates
+> - Pinpoint cite to brief page where the argument appears
+>
+> **7. Preservation Flags**
+> For each issue, note whether the brief identifies where the argument was raised below (objection, motion, etc.) with record citation. If the brief is silent on preservation, flag it.
+>
+> **Citation precision:** For every factual assertion, provide the record cite with pinpoint page (R##:page) and a short quote (≤ 15 words) identifying the relevant passage.
+>
 > Return only the structured extraction. Do not analyze or recommend.
 
 ### Agent B: Appellee Brief Analysis
@@ -194,6 +220,27 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > **4. Additional Facts**
 > Any facts the appellee raises that the appellant omitted, with record citations.
 >
+> **5. Exhibit & Key Evidence Index**
+> For each exhibit or key piece of evidence the appellee/respondent references:
+> - Exhibit identifier and record citation (pinpoint page)
+> - What the appellee/respondent claims it proves
+> - Note if this exhibit was also cited by the other side (and for a different purpose)
+>
+> **6. Statutory Interpretation**
+> If any issue involves statutory interpretation:
+> - What interpretation the appellee/respondent advocates
+> - Whether they agree on the text at issue or frame it differently
+>
+> **7. Procedural/Jurisdictional Arguments**
+> - Arguments about appropriateness of review (mootness, standing, ripeness, jurisdiction)
+> - Arguments that an issue was not preserved or was waived
+> - Arguments that the appeal is untimely or procedurally defective
+>
+> **8. Factual Omissions**
+> List significant facts from the appellant's brief that the appellee does NOT address or dispute. Also list facts the appellee emphasizes that the appellant omitted.
+>
+> **Citation precision:** For every factual assertion, provide the record cite with pinpoint page (R##:page) and a short quote (≤ 15 words) identifying the relevant passage.
+>
 > Return only the structured extraction. Do not analyze or recommend.
 
 ### Agent C1: Reply Brief (Conditional)
@@ -210,10 +257,11 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > Extract the following in structured markdown:
 >
-> - New arguments or authorities not in the opening brief
-> - Concessions or abandoned points
-> - Clarifications of appellant's position
-> - Any new case citations not in the opening brief
+> - **New arguments or authorities** not in the opening brief — for each, cite the reply brief page and note that it was not raised in the opening
+> - **Concessions or abandoned points** — issues from the opening brief not defended in the reply
+> - **Clarifications** of appellant's/petitioner's position
+> - **New case citations** not in the opening brief
+> - **Responses to preservation/waiver challenges** — does the reply address appellee's claim that an issue wasn't preserved?
 >
 > Return only the structured extraction. Do not analyze or recommend.
 
@@ -356,6 +404,18 @@ Collect results from all agents. Then:
 - **Map appellee's responses** to each appellant issue (from Agent B).
 - **Merge** arguments, facts, and citations per issue from all agents.
 
+**Comparative analysis** — using the merged agent results, build the following tables for use in the memo:
+
+1. **Disputed vs. Undisputed Facts:** Cross-reference Agent A and Agent B fact lists. A fact is "undisputed" if both sides cite it or neither contests it. A fact is "disputed" if the parties offer conflicting accounts or one side challenges the other's characterization. For each disputed fact, note both versions with pinpoint cites.
+
+2. **Exhibit Cross-Reference:** Merge exhibit lists from Agents A and B. For each exhibit, show what each side claims it proves. Flag exhibits cited by only one side.
+
+3. **Preservation & Waiver:** For each issue, combine Agent A's preservation flags with Agent B's waiver arguments. Assess whether preservation appears adequate based on the record citations provided.
+
+4. **First-Raised-on-Appeal:** Flag any argument that appears to lack a record citation for where it was raised below, or that the appellee claims was not preserved.
+
+5. **Reply-Only Arguments:** From Agent C1, list arguments that appear in the reply but not in the opening brief. These may be improper new arguments — flag them.
+
 **Fallback handling:** If any subagent fails or times out, read the relevant document(s) directly in main context and perform that analysis step here. If >50% of documents failed text extraction in Step 1, abandon the parallel approach entirely and fall back to sequential multimodal reads of the PDFs.
 
 ### Step 3: Legal Framing
@@ -363,8 +423,11 @@ Collect results from all agents. Then:
 For each consolidated issue:
 
 1. **Determine correct standard of review** — adjudicate between the parties' positions using Agent D's precedent analysis (if available). If both sides cite the same standard, adopt it. If they disagree, assess which is correct based on the cited authorities.
-2. **Assess each side's position** — strengths and weaknesses, with specific citations.
-3. **Determine recommended disposition** — affirm, reverse, or remand, with reasoning.
+2. **Identify the strongest argument supporting the district court's ruling** — articulate the best case for affirmance with specific citations.
+3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
+4. **Assess preservation** — if there's a waiver/preservation dispute, analyze it before reaching the merits.
+5. **Flag statutory interpretation issues** — if the issue turns on statutory text, identify the interpretive question, the competing readings, and any relevant canons.
+6. **If `recommend_mode` is enabled**, determine recommended disposition — affirm, reverse, or remand, with reasoning. If disabled, end the analysis after presenting both sides' strongest positions without stating a preferred outcome.
 
 ### Step 4: Generate the Memo
 
@@ -372,7 +435,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
 
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
 2. **Quick Reference** — 4-8 key documents with record citations (from Agent A)
-3. **Opening [¶1]** — summarize the case, identify all issues, **bold the recommendation**
+3. **Opening [¶1]** — summarize the case and identify all issues. If `recommend_mode`, **bold the recommendation**. Otherwise, state the key tension or question the case presents.
 4. **BACKGROUND** — factual and procedural history with record citations for every assertion
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
    - Standard of review with case authority
@@ -380,7 +443,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
    - Appellee's arguments with citations
    - Sub-arguments (A, B, C) as needed
    - Analysis and assessment
-6. **CONCLUSION** — restate recommendation in **bold**
+6. **CONCLUSION** — If `recommend_mode`, restate recommendation in **bold**. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
 
 ### Step 5: Self-Review
 
@@ -391,10 +454,17 @@ Review the memo against this checklist before presenting:
 - [ ] Every fact in BACKGROUND has a record citation
 - [ ] Each issue section has a standard of review with case authority
 - [ ] Both sides' arguments are fairly presented with citations
-- [ ] Recommendation appears in ¶1 (bold) and CONCLUSION (bold)
+- [ ] Disputed facts are noted inline in BACKGROUND with both versions and cites
+- [ ] Preservation is addressed for each issue (or noted as not at issue)
+- [ ] Each issue analysis identifies the strongest argument for and against the district court
+- [ ] Exhibit table included if ≥ 2 contested exhibits
+- [ ] Writ terminology used correctly if writ proceeding
+- [ ] If `recommend_mode`: recommendation appears in ¶1 (bold) and CONCLUSION (bold)
+- [ ] If not `recommend_mode`: memo does NOT state a preferred disposition; analysis ends with both sides' positions
 - [ ] No placeholder brackets like [Date], [page], [County]
 - [ ] Only citations that appear in the parties' briefs are used
 - [ ] Citation formats are correct (see style-spec.md)
+- [ ] Record citations include pinpoint pages where available
 
 Fix any issues found before presenting the memo to the user.
 
@@ -466,6 +536,17 @@ Verified: X | Unverified: Y | Skipped: Z
 
 - **Never fabricate citations.** Only cite cases and authorities that appear in the parties' briefs.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
-- **Be neutral.** Present both sides fairly before offering analysis. Recommendations should be clearly stated but appropriately hedged.
+- **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be clearly stated but appropriately hedged. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.
 - **Use "the Court"** when referring to the ND Supreme Court; **"the district court"** for the lower court.
+
+## Writ Proceedings
+
+When the case is a writ proceeding (petition for supervisory writ, habeas corpus, etc.):
+
+- Use **petitioner/respondent** instead of appellant/appellee
+- Agent A reads the petition; Agent B reads the response
+- The opening paragraph should identify the type of writ and the relief sought
+- Add a **threshold section** before the merits issues: whether the Court should exercise its supervisory jurisdiction (for supervisory writs) or whether the petition states a prima facie case (for habeas). This is Issue I in the memo.
+- The "district court ruling" framing becomes "the ruling or action the petitioner seeks to challenge"
+- Standard of review may differ — writs often involve questions of jurisdiction or authority, reviewed de novo

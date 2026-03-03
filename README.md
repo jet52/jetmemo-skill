@@ -5,7 +5,7 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) installed
-- `splitmarks` — PDF bookmark splitter ([github.com/jet52/splitmarks](https://github.com/jet52/splitmarks))
+- `pypdf` — PDF processing library (`pip install pypdf`)
 - Local reference directories:
   - `~/refs/opin/` — ND Supreme Court opinions (markdown)
   - `~/refs/ndcc/` — North Dakota Century Code
@@ -78,6 +78,7 @@ bench-memo-skill/
     │   ├── memo-format.md
     │   └── style-spec.md
     └── scripts/
+        ├── splitmarks.py
         └── verify_citations.py
 ```
 
@@ -85,7 +86,7 @@ bench-memo-skill/
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
-| splitmarks | Split PDF packets by bookmark | Recommended |
+| pypdf | Split PDF packets by bookmark | Recommended |
 | ~/refs/opin/ | ND opinion lookup | Recommended |
 | ~/refs/ndcc/ | Century Code lookup | Recommended |
 | ~/refs/ndac/ | Admin Code lookup | Recommended |
