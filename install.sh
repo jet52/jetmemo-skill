@@ -5,13 +5,15 @@ SKILL_NAME="bench-memo"
 INSTALL_DIR="$HOME/.claude/skills/$SKILL_NAME"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Installing $SKILL_NAME skill..."
+VERSION=$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "unknown")
+echo "Installing $SKILL_NAME skill v$VERSION..."
 
 # Create target directory
 mkdir -p "$INSTALL_DIR"
 
-# Copy skill files
+# Copy skill files and version
 cp -a "$SCRIPT_DIR/skill/"* "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/VERSION"
 
 echo "Installed to $INSTALL_DIR"
 

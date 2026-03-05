@@ -1,11 +1,17 @@
 SKILL_NAME := bench-memo
 ZIP_NAME := $(SKILL_NAME)-skill.zip
 
-.PHONY: package clean install test
+.PHONY: package clean install test release
 
 package: clean
-	zip -r $(ZIP_NAME) skill/ install.sh README.md \
+	zip -r $(ZIP_NAME) skill/ install.sh README.md VERSION \
 		-x "skill/.venv/*" "skill/node_modules/*" "skill/package-lock.json" "skill/__pycache__/*"
+
+release:
+	@VERSION=$$(cat VERSION) && \
+	git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
+	echo "Tagged v$$VERSION" && \
+	echo "Push with: git push origin v$$VERSION"
 
 clean:
 	rm -f $(ZIP_NAME)
@@ -21,4 +27,5 @@ test:
 	@test -f skill/scripts/splitmarks.py || (echo "FAIL: skill/scripts/splitmarks.py missing" && exit 1)
 	@test -f install.sh || (echo "FAIL: install.sh missing" && exit 1)
 	@test -f README.md || (echo "FAIL: README.md missing" && exit 1)
+	@test -f VERSION || (echo "FAIL: VERSION missing" && exit 1)
 	@echo "All checks passed."
