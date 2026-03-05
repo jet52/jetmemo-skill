@@ -15,6 +15,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | ND opinions (markdown) | `~/refs/opin/markdown/`                                    |
 | ND Century Code        | `~/refs/ndcc/`                                             |
 | ND Admin Code          | `~/refs/ndac/`                                             |
+| ND Court Rules         | `~/refs/rule/`                                             |
 | Style reference        | `~/.claude/skills/bench-memo/references/style-spec.md`    |
 | Memo format reference  | `~/.claude/skills/bench-memo/references/memo-format.md`   |
 | Verification script    | `~/.claude/skills/bench-memo/scripts/verify_citations.py` |
@@ -39,6 +40,22 @@ Each chapter file contains all sections in that chapter as `### § T-CC-SS` head
 - N.D.A.C. § 75-07-01 → `~/refs/ndac/title-75/article-75-07.md` (single-file article)
 
 Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
+
+**ND Court Rules** — `~/refs/rule/<category>/rule-<number>.md`. Categories map from citation abbreviations:
+
+| Citation prefix | Directory |
+| --------------- | --------- |
+| N.D.R.App.P. | `ndrappp/` |
+| N.D.R.Civ.P. | `ndrcivp/` |
+| N.D.R.Crim.P. | `ndrcrimp/` |
+| N.D.R.Ev. | `ndrev/` |
+| N.D.R.Ct. | `ndrct/` |
+| N.D.R.Juv.P. | `ndrjuvp/` |
+| N.D.Sup.Ct.Admin.R. | `ndsupctadminr/` |
+| N.D.R.Prof.Conduct | `ndrprofconduct/` |
+| N.D.Code.Jud.Conduct | `ndcodejudconduct/` |
+
+Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 35.1 → `~/refs/rule/ndrappp/rule-35.1.md`. The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — read the whole file and search for the subsection.
 
 **READ-ONLY access to `~/refs/` is pre-authorized.** All agents (including subagents) may read files from this directory without additional permission. Never modify, delete, or write to any file in this directory.
 
@@ -118,6 +135,7 @@ Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
    - **ND opinions:** `\d{4} ND \d+` patterns (e.g., `2022 ND 210`)
    - **N.D.C.C.:** `N\.D\.C\.C\. §\s*[\d.]+[-‑][\d.]+[-‑][\d.]+` patterns (e.g., `N.D.C.C. § 14-07.1-02`)
    - **N.D.A.C.:** `N\.D\.A\.C\. §\s*[\d.]+[-‑][\d.]+[-‑][\d.]+` patterns (e.g., `N.D.A.C. § 75-02-01.2-01`)
+   - **Court Rules:** `N\.D\.R\.(App|Civ|Crim|Ev|Ct|Juv)\.P?\.\s*\d+` and similar patterns (e.g., `N.D.R.App.P. 35.1`, `N.D.R.Civ.P. 12(b)`, `N.D.R.Ev. 401`)
 
 ---
 
@@ -348,26 +366,31 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > **B. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.
 
-### Agent E: Statutory & Administrative Code Verification (Conditional)
+### Agent E: Statutory, Administrative Code & Court Rule Verification (Conditional)
 
-**Launch only if** N.D.C.C. or N.D.A.C. citations were found in Step 1.
+**Launch only if** N.D.C.C., N.D.A.C., or court rule citations were found in Step 1.
 
-**Reads:** local markdown files from `~/refs/ndcc/` and `~/refs/ndac/`
+**Reads:** local markdown files from `~/refs/ndcc/`, `~/refs/ndac/`, and `~/refs/rule/`
 
 **Prompt template:**
 
-> **Statutory & Administrative Code Verification**
+> **Statutory, Administrative Code & Court Rule Verification**
 >
-> You have a list of N.D.C.C. and/or N.D.A.C. citations extracted from appellate briefs. For each citation, look up the section text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
+> You have a list of N.D.C.C., N.D.A.C., and/or court rule citations extracted from appellate briefs. For each citation, look up the text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
 >
 > **Local file locations (check these first — fastest):**
 >
 > - **N.D.C.C.:** `~/refs/ndcc/title-<T>/chapter-<T>-<CC>.md` — where `<T>` is the title and `<CC>` is the chapter portion of the section number. For example, N.D.C.C. § 14-07.1-02 is in `~/refs/ndcc/title-14/chapter-14-07.1.md`. Sections appear as `### §` headings within the chapter file.
 > - **N.D.A.C.:** `~/refs/ndac/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` — where `<T>` is the title, `<AA>` is the article, and `<CC>` is the chapter. For example, N.D.A.C. § 75-02-01.2-01 is in `~/refs/ndac/title-75/article-75-02/chapter-75-02-01.2.md`. Some small articles are a single file: `~/refs/ndac/title-<T>/article-<T>-<AA>.md`.
 >
+> - **Court Rules:** `~/refs/rule/<category>/rule-<number>.md` — map the citation prefix to the directory:
+>>   - N.D.R.App.P. → `ndrappp/`, N.D.R.Civ.P. → `ndrcivp/`, N.D.R.Crim.P. → `ndrcrimp/`, N.D.R.Ev. → `ndrev/`, N.D.R.Ct. → `ndrct/`, N.D.R.Juv.P. → `ndrjuvp/`, N.D.Sup.Ct.Admin.R. → `ndsupctadminr/`, N.D.R.Prof.Conduct → `ndrprofconduct/`, N.D.Code.Jud.Conduct → `ndcodejudconduct/`
+>>   - Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`, then search within the file for subsection (b).
+>
 > **Web fallback:** If `~/refs/ndcc/` or `~/refs/ndac/` does not exist, fall back to:
 > - N.D.C.C.: WebFetch `https://www.ndlegis.gov/cencode/t{title}c{chapter}.html`
 > - N.D.A.C.: WebFetch `https://www.ndlegis.gov/information/acdata/html/{title}-{article}-{chapter}.html`
+> - Court Rules: WebFetch `https://www.ndcourts.gov/legal-resources/rules/{category}/{rule-number}` (if `~/refs/rule/` is absent)
 >
 > **Citations to verify:**
 > [Insert numbered list of citations with the proposition each is cited for, and any quoted language from the briefs]
@@ -495,10 +518,14 @@ If the user requests verification (or if you want to flag potential issues), ver
 1. **Local markdown** (fastest) — read `~/refs/ndac/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` and search for the `### §` heading
 2. **ND Legislature** (fallback) — use WebFetch to check `https://www.ndlegis.gov/information/acdata/html/{title}-{article}-{chapter}.html`
 
+#### ND Court Rule Citations
+
+1. **Local markdown** (fastest) — read `~/refs/rule/<category>/rule-<number>.md` and search for the subsection
+2. **ND Courts** (fallback) — use WebFetch to check `https://www.ndcourts.gov/legal-resources/rules/<category>/<rule-number>`
+
 #### What to Skip
 
 - Record citations (R##) — these reference the appellate record, not verifiable online
-- Rule citations (N.D.R.App.P., N.D.R.Civ.P., N.D.R.Ev.) — procedural rules, skip
 
 After verification, append a verification summary to the memo:
 
@@ -522,6 +549,7 @@ Verified: X | Unverified: Y | Skipped: Z
 | Scanned PDFs      | Agent uses `Read` on PDF directly         | Fallback when text extraction fails  |
 | ND opinions       | Agent reads `.md` directly                | Already markdown, very efficient     |
 | N.D.C.C. / N.D.A.C. | Agent reads local `.md`, web fallback  | Local is fastest; web if ~/refs absent |
+| Court Rules        | Agent reads local `.md`, web fallback  | Local is fastest; web if ~/refs absent |
 | Reference files   | Orchestrator reads directly               | Small, needed for synthesis          |
 
 ## Fallback Handling

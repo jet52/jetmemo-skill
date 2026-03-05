@@ -189,7 +189,8 @@ def main():
     parser.add_argument("--courtlistener-key", default=os.environ.get("COURTLISTENER_API_KEY", ""),
                         help="CourtListener API key")
     parser.add_argument("--opinions-dir", default=os.environ.get("OPINIONS_MD",
-                        os.environ.get("COURT_DATA", "/Users/jerod/cDocs/refs/ndsc_opinions/markdown")),
+                        os.environ.get("COURT_DATA",
+                        str(Path.home() / "refs" / "opin"))),
                         help="Path to local ND opinions directory")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
