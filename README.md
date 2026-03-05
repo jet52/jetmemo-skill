@@ -17,7 +17,7 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 1. Download and extract `bench-memo-skill.zip`
 2. Run the installer:
    ```bash
-   bash install.sh
+   python3 install.py
    ```
 
 **Option B: From source**
@@ -25,7 +25,7 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 ```bash
 git clone https://github.com/jet52/bench-memo-skill.git
 cd bench-memo-skill
-make install
+python3 install.py
 ```
 
 **Option C: Manual**
@@ -34,7 +34,7 @@ Copy the `skill/` directory contents to `~/.claude/skills/bench-memo/`:
 
 ```bash
 mkdir -p ~/.claude/skills/bench-memo
-cp -a skill/* ~/.claude/skills/bench-memo/
+cp -r skill/* ~/.claude/skills/bench-memo/
 ```
 
 ### Claude Desktop
@@ -66,7 +66,9 @@ Provide case documents (briefs, notices of appeal, orders) as PDFs in the workin
 ```
 bench-memo-skill/
 ├── README.md
+├── VERSION
 ├── Makefile
+├── install.py
 ├── install.sh
 ├── .gitignore
 └── skill/
@@ -75,6 +77,7 @@ bench-memo-skill/
     │   ├── memo-format.md
     │   └── style-spec.md
     └── scripts/
+        ├── check_update.py
         ├── splitmarks.py
         └── verify_citations.py
 ```
@@ -93,6 +96,9 @@ unzip opin.zip -d ~/refs/opin
 # Required for statutory verification (Agent E)
 unzip ndcc.zip -d ~/refs/ndcc
 unzip ndac.zip -d ~/refs/ndac
+
+# Required for court rule verification (Agent E)
+unzip rule.zip -d ~/refs/rule
 ```
 
 | Archive | Contents | Install to | Purpose |
@@ -100,8 +106,9 @@ unzip ndac.zip -d ~/refs/ndac
 | [opin.zip](https://ndconst.org/_media/tools/opin.zip) | ND Supreme Court opinions (1997-present) | `~/refs/opin/` | Precedent lookup and citation verification |
 | [ndcc.zip](https://ndconst.org/_media/tools/ndcc.zip) | North Dakota Century Code | `~/refs/ndcc/` | Statutory text verification |
 | [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/ndac/` | Administrative rule verification |
+| [rule.zip](https://ndconst.org/_media/tools/rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
 
-If `~/refs/ndcc/` or `~/refs/ndac/` are missing, the skill falls back to web lookups on ndlegis.gov. There is currently no web fallback for opinion lookups.
+If `~/refs/ndcc/`, `~/refs/ndac/`, or `~/refs/rule/` are missing, the skill falls back to web lookups. There is currently no web fallback for opinion lookups.
 
 ## Other Dependencies
 
