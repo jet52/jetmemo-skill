@@ -1,4 +1,4 @@
-# Bench Memo Skill
+# JetMemo Skill
 
 Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Analyzes briefs, notices of appeal, and orders to produce structured bench memos for oral argument preparation.
 
@@ -14,7 +14,7 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 
 **Option A: From .zip**
 
-1. Download and extract `bench-memo-skill.zip`
+1. Download and extract `jetmemo-skill.zip`
 2. Run the installer:
    ```bash
    python3 install.py
@@ -23,25 +23,25 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 **Option B: From source**
 
 ```bash
-git clone https://github.com/jet52/bench-memo-skill.git
-cd bench-memo-skill
+git clone https://github.com/jet52/jetmemo-skill.git
+cd jetmemo-skill
 python3 install.py
 ```
 
 **Option C: Manual**
 
-Copy the `skill/` directory contents to `~/.claude/skills/bench-memo/`:
+Copy the `skill/` directory contents to `~/.claude/skills/jetmemo/`:
 
 ```bash
-mkdir -p ~/.claude/skills/bench-memo
-cp -r skill/* ~/.claude/skills/bench-memo/
+mkdir -p ~/.claude/skills/jetmemo
+cp -r skill/* ~/.claude/skills/jetmemo/
 ```
 
 ### Claude Desktop
 
 1. Open Settings > Features > Claude's Computer Use > Skills directory
 2. Set the skills directory to a folder of your choice (e.g., `~/.claude/skills/`)
-3. Copy `skill/` contents into `<skills-dir>/bench-memo/`
+3. Copy `skill/` contents into `<skills-dir>/jetmemo/`
 
 ### Claude Projects (web)
 
@@ -64,7 +64,7 @@ Provide case documents (briefs, notices of appeal, orders) as PDFs in the workin
 ## File Structure
 
 ```
-bench-memo-skill/
+jetmemo-skill/
 ├── README.md
 ├── VERSION
 ├── Makefile

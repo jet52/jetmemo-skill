@@ -110,7 +110,7 @@ def verify_nd_courts(citation: dict) -> dict | None:
         time.sleep(1)  # Rate limit
         cite_str = citation["citation"]
         url = f"https://www.ndcourts.gov/supreme-court/opinions?search={urllib.parse.quote(cite_str)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "bench-memo-verifier/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "jetmemo-verifier/1.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             html = resp.read().decode("utf-8", errors="replace")
             if cite_str in html:
@@ -136,7 +136,7 @@ def verify_courtlistener(citation: dict, api_key: str) -> dict | None:
             headers={
                 "Authorization": f"Token {api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": "bench-memo-verifier/1.0",
+                "User-Agent": "jetmemo-verifier/1.0",
             },
             method="POST",
         )
@@ -169,7 +169,7 @@ def verify_statute(citation: dict) -> dict | None:
     try:
         time.sleep(1)
         url = f"https://www.ndlegis.gov/cencode/t{title}c{chapter}.html"
-        req = urllib.request.Request(url, headers={"User-Agent": "bench-memo-verifier/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "jetmemo-verifier/1.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             html = resp.read().decode("utf-8", errors="replace")
             if section in html:

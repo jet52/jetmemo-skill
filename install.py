@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Cross-platform installer for the bench-memo skill."""
+"""Cross-platform installer for the jetmemo skill."""
 
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-SKILL_NAME = "bench-memo"
+SKILL_NAME = "jetmemo"
 SCRIPT_DIR = Path(__file__).resolve().parent
 INSTALL_DIR = Path.home() / ".claude" / "skills" / SKILL_NAME
 
