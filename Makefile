@@ -1,17 +1,22 @@
-SKILL_NAME := bench-memo
+SKILL_NAME := jetmemo
 ZIP_NAME := $(SKILL_NAME)-skill.zip
 
 .PHONY: package clean install test release
 
 package: clean
-	zip -r $(ZIP_NAME) skill/ install.py install.sh README.md VERSION \
-		-x "skill/.venv/*" "skill/node_modules/*" "skill/package-lock.json" "skill/__pycache__/*"
+	mkdir -p $(SKILL_NAME)-skill
+	cp -r skill/ install.py install.sh README.md VERSION $(SKILL_NAME)-skill/
+	cd $(SKILL_NAME)-skill && rm -rf skill/.venv skill/node_modules skill/package-lock.json skill/__pycache__
+	zip -r $(ZIP_NAME) $(SKILL_NAME)-skill/
+	rm -rf $(SKILL_NAME)-skill
 
-release:
+release: package
 	@VERSION=$$(cat VERSION) && \
 	git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
-	echo "Tagged v$$VERSION" && \
-	echo "Push with: git push origin v$$VERSION"
+	git push origin main && \
+	git push origin "v$$VERSION" && \
+	gh release create "v$$VERSION" $(ZIP_NAME) --title "v$$VERSION" --generate-notes && \
+	echo "Released v$$VERSION"
 
 clean:
 	rm -f $(ZIP_NAME)
