@@ -1,3 +1,4 @@
 # TODO
 
 - [ ] **Agent D: Add web fallback for opinion lookups.** When `~/refs/opin/` is absent, Agent D doesn't launch and the memo lacks precedent verification entirely. Add a web fallback using ndcourts.gov search (`https://www.ndcourts.gov/supreme-court/opinions?search={citation}`) so Agent D can still verify cited opinions and extract holdings. Model after the existing NDCC/NDAC web fallback pattern in Agent E.
+- [ ] **Agent D: Add web query for non-ND opinion lookups.** For cases from jurisdictions outside north dakota and for north dakota cases without a medium-neutral citation (yyyy ND zzz), use a web query using ndcourts.gov search, courtlistener, or other (preferably official, but also use unofficial aggregators like justia and google). Expand for all citations for which we have an availble source in our cite2url table.
