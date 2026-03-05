@@ -6,10 +6,7 @@ Generate bench memos for the North Dakota Supreme Court from appellate case PDFs
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) installed
 - `pypdf` — PDF processing library (`pip install pypdf`)
-- Local reference directories:
-  - `~/refs/opin/` — ND Supreme Court opinions (markdown)
-  - `~/refs/ndcc/` — North Dakota Century Code
-  - `~/refs/ndac/` — North Dakota Administrative Code
+- Reference data (see [Reference Data](#reference-data) below)
 
 ## Installation
 
@@ -82,11 +79,32 @@ bench-memo-skill/
         └── verify_citations.py
 ```
 
-## External Dependencies
+## Reference Data
+
+The skill uses local reference datasets for citation verification and precedent lookup. Without these, the memo will still generate but citation verification and precedent analysis will be limited.
+
+Download the reference archives from [ndconst.org/tools](https://ndconst.org/tools) and install to `~/refs/`:
+
+```bash
+mkdir -p ~/refs
+# Required for precedent verification (Agent D)
+unzip opin.zip -d ~/refs/opin
+
+# Required for statutory verification (Agent E)
+unzip ndcc.zip -d ~/refs/ndcc
+unzip ndac.zip -d ~/refs/ndac
+```
+
+| Archive | Contents | Install to | Purpose |
+|---------|----------|------------|---------|
+| [opin.zip](https://ndconst.org/_media/tools/opin.zip) | ND Supreme Court opinions (1997-present) | `~/refs/opin/` | Precedent lookup and citation verification |
+| [ndcc.zip](https://ndconst.org/_media/tools/ndcc.zip) | North Dakota Century Code | `~/refs/ndcc/` | Statutory text verification |
+| [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/ndac/` | Administrative rule verification |
+
+If `~/refs/ndcc/` or `~/refs/ndac/` are missing, the skill falls back to web lookups on ndlegis.gov. There is currently no web fallback for opinion lookups.
+
+## Other Dependencies
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | Split PDF packets by bookmark | Recommended |
-| ~/refs/opin/ | ND opinion lookup | Recommended |
-| ~/refs/ndcc/ | Century Code lookup | Recommended |
-| ~/refs/ndac/ | Admin Code lookup | Recommended |
