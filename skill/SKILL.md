@@ -186,16 +186,16 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > Chronological list of key facts with record citations for every assertion.
 >
 > **4. Key Documents for Quick Reference**
-> 4-8 important documents with record citations and brief descriptions.
+> 4-8 documents important for the court to consider in resolving issues on appeal -- with record citations and brief descriptions.
 >
 > **5. Exhibit & Key Evidence Index**
-> For each exhibit or key piece of evidence referenced:
+> For each key piece of evidence (including exhibits, transcript testimony, etc) referenced:
 > - Exhibit identifier and record citation (pinpoint page)
 > - What the appellant/petitioner claims it proves
 > - Short identifying quote (≤ 25 words) from the brief where it is discussed
 >
 > **6. Statutory Interpretation**
-> If any issue involves interpreting a statute, rule, or regulation:
+> If any issue involves interpretation of constitution, code, or other legal text (including contract, will, jury instruction, etc):
 > - Which provision and the specific text at issue
 > - What interpretation the appellant/petitioner advocates
 > - Pinpoint cite to brief page where the argument appears
@@ -245,7 +245,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - Note if this exhibit was also cited by the other side (and for a different purpose)
 >
 > **6. Statutory Interpretation**
-> If any issue involves statutory interpretation:
+> If any issue involves interpretation of constitution, code, or other legal text:
 > - What interpretation the appellee/respondent advocates
 > - Whether they agree on the text at issue or frame it differently
 >
@@ -285,7 +285,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 ### Agent C2: District Court Orders (Conditional)
 
-**Launch only if** district court orders exist in the manifest.
+**Launch only if** district court orders on appeal exist in the manifest.
 
 **Reads:** district court order text(s) — pass only the specific split record items (e.g., R7, R36, R37), not the full record PDF.
 
@@ -310,7 +310,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 **Launch only if** a transcript exists in the manifest.
 
-**Reads:** transcript text or PDF. If the transcript is marked `needs_visual_read`, pass the PDF path with instructions to use the Read tool on the PDF directly, reading page by page.
+**Reads:** transcript text or PDF. If the transcript is marked `needs_visual_read`, pass the PDF path with instructions to use the Read tool on the PDF directly, reading page by page. Because this is slow, indicate this may delay analysis.
 
 **Prompt template:**
 
@@ -431,7 +431,7 @@ Collect results from all agents. Then:
 
 1. **Disputed vs. Undisputed Facts:** Cross-reference Agent A and Agent B fact lists. A fact is "undisputed" if both sides cite it or neither contests it. A fact is "disputed" if the parties offer conflicting accounts or one side challenges the other's characterization. For each disputed fact, note both versions with pinpoint cites.
 
-2. **Exhibit Cross-Reference:** Merge exhibit lists from Agents A and B. For each exhibit, show what each side claims it proves. Flag exhibits cited by only one side.
+2. **Exhibit Cross-Reference:** Merge lists of key evidence from Agents A and B. For each exhibit or record item, show what each side claims it proves. Flag exhibits cited by only one side.
 
 3. **Preservation & Waiver:** For each issue, combine Agent A's preservation flags with Agent B's waiver arguments. Assess whether preservation appears adequate based on the record citations provided.
 
