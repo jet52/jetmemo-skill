@@ -1,6 +1,6 @@
 ---
-name: bench-memo
-description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
+name: jetmemo
+description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
 # Bench Memo Generator
@@ -11,15 +11,15 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 
 | Resource               | Path                                                      |
 | ---------------------- | --------------------------------------------------------- |
-| This skill             | `~/.claude/skills/bench-memo/`                            |
+| This skill             | `~/.claude/skills/jetmemo/`                            |
 | ND opinions (markdown) | `~/refs/opin/markdown/`                                    |
 | ND Century Code        | `~/refs/ndcc/`                                             |
 | ND Admin Code          | `~/refs/ndac/`                                             |
 | ND Court Rules         | `~/refs/rule/`                                             |
-| Style reference        | `~/.claude/skills/bench-memo/references/style-spec.md`    |
-| Memo format reference  | `~/.claude/skills/bench-memo/references/memo-format.md`   |
-| Verification script    | `~/.claude/skills/bench-memo/scripts/verify_citations.py` |
-| splitmarks             | `~/.claude/skills/bench-memo/scripts/splitmarks.py`       |
+| Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
+| Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
+| Verification script    | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
+| splitmarks             | `~/.claude/skills/jetmemo/scripts/splitmarks.py`       |
 
 > **Dependency:** splitmarks.py requires `pypdf`. Install with `pip install pypdf`.
 
@@ -87,15 +87,15 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 3. **Split large PDFs down to individual record items.** For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
-   python ~/.claude/skills/bench-memo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
-   python ~/.claude/skills/bench-memo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v  # first pass
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v  # first pass
    ```
 
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 
    ```bash
-   python ~/.claude/skills/bench-memo/scripts/splitmarks.py .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
-   python ~/.claude/skills/bench-memo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v  # split again
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v  # split again
    ```
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
@@ -109,8 +109,8 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 ### Step 1: Read References and Extract Text
 
 1. **Read references** into main context (small files, needed for synthesis):
-   - `~/.claude/skills/bench-memo/references/style-spec.md`
-   - `~/.claude/skills/bench-memo/references/memo-format.md`
+   - `~/.claude/skills/jetmemo/references/style-spec.md`
+   - `~/.claude/skills/jetmemo/references/memo-format.md`
 
 2. **Extract text** from all PDFs using `pdftotext`:
 

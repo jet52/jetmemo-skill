@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Check for bench-memo skill updates against the GitHub repo."""
+"""Check for jetmemo skill updates against the GitHub repo."""
 
 import json
 import sys
 import urllib.request
 from pathlib import Path
 
-REPO = "jet52/bench-memo-skill"
+REPO = "jet52/jetmemo-skill"
 GITHUB_API = f"https://api.github.com/repos/{REPO}/releases/latest"
-SKILL_DIR = Path.home() / ".claude" / "skills" / "bench-memo"
+SKILL_DIR = Path.home() / ".claude" / "skills" / "jetmemo"
 VERSION_FILE = SKILL_DIR / "VERSION"
 
 
@@ -40,20 +40,20 @@ def parse_version(v: str) -> tuple[int, ...]:
 def main():
     local = local_version()
     if not local:
-        print("bench-memo: version unknown (no VERSION file)")
+        print("jetmemo: version unknown (no VERSION file)")
         sys.exit(1)
 
     remote = latest_release()
     if not remote:
-        print(f"bench-memo v{local} (update check failed — couldn't reach GitHub)")
+        print(f"jetmemo v{local} (update check failed — couldn't reach GitHub)")
         sys.exit(0)
 
     if parse_version(remote) > parse_version(local):
-        print(f"bench-memo v{local} — update available: v{remote}")
+        print(f"jetmemo v{local} — update available: v{remote}")
         print(f"  https://github.com/{REPO}/releases/latest")
         sys.exit(0)
     else:
-        print(f"bench-memo v{local} (up to date)")
+        print(f"jetmemo v{local} (up to date)")
         sys.exit(0)
 
 
