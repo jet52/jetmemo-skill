@@ -18,10 +18,12 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | ND Court Rules         | `~/refs/rule/`                                             |
 | Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
 | Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
-| Verification script    | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
+| Citation checker       | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
 | splitmarks             | `~/.claude/skills/jetmemo/scripts/splitmarks.py`       |
 
-> **Dependency:** splitmarks.py requires `pypdf`. Install with `pip install pypdf`.
+> **Dependencies:**
+> - splitmarks.py requires `pypdf` (`pip install pypdf`)
+> - verify_citations.py requires `jetcite` — install as a Claude skill from [github.com/jet52/jetcite](https://github.com/jet52/jetcite) or via `pip install git+https://github.com/jet52/jetcite.git`
 
 ### ~/refs directory layout
 
@@ -131,11 +133,15 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 
    When `needs_visual_read` is set, the agent prompt **must** receive the PDF path (not the `.txt` path) with explicit instructions: "Use the Read tool on this PDF directly, reading page by page."
 
-4. **Extract citation list:** Grep all `.txt` files to build citation lists. These determine which conditional agents to launch.
-   - **ND opinions:** `\d{4} ND \d+` patterns (e.g., `2022 ND 210`)
-   - **N.D.C.C.:** `N\.D\.C\.C\. §\s*[\d.]+[-‑][\d.]+[-‑][\d.]+` patterns (e.g., `N.D.C.C. § 14-07.1-02`)
-   - **N.D.A.C.:** `N\.D\.A\.C\. §\s*[\d.]+[-‑][\d.]+[-‑][\d.]+` patterns (e.g., `N.D.A.C. § 75-02-01.2-01`)
-   - **Court Rules:** `N\.D\.R\.(App|Civ|Crim|Ev|Ct|Juv)\.P?\.\s*\d+` and similar patterns (e.g., `N.D.R.App.P. 35.1`, `N.D.R.Civ.P. 12(b)`, `N.D.R.Ev. 401`)
+4. **Extract citation list:** Run the citation checker on all `.txt` files to build a structured citation list. This determines which conditional agents to launch.
+
+   ```bash
+   cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json > citations.json
+   ```
+
+   The output is a JSON array. Each entry has `cite_type`, `local_path`, `local_exists`, `url`, and `search_hint`. Use `cite_type` to determine which agents to launch:
+   - Any `cite_type` of `nd_case` → launch Agent D
+   - Any `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, `nd_const` → launch Agent E
 
 ---
 
@@ -331,73 +337,100 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 ### Agent D: Precedent Lookup (Conditional)
 
-**Launch only if** ND citations were found in Step 1 **and** the opinions directory exists at `~/refs/opin/markdown/`.
+**Launch only if** `citations.json` contains entries with `cite_type` of `nd_case`.
 
-**Reads:** local opinion markdown files
+**Reads:** local opinion markdown files (preferred), ndcourts.gov (fallback), CourtListener search API (secondary fallback)
+
+**Input:** Pass Agent D the filtered list of `nd_case` entries from `citations.json`. Each entry includes `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
 > **ND Precedent Verification**
 >
-> You have a list of ND Supreme Court citations extracted from appellate briefs. For each citation, read the local opinion file and extract relevant information.
+> You have a list of ND Supreme Court citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the opinion and extract relevant information.
 >
-> **File location:** `~/refs/opin/markdown/`. Files are organized as `<year>/<year>ND<number>.md`. For example, `2022 ND 210` maps to `~/refs/opin/markdown/2022/2022ND210.md`. Paragraphs are marked `[¶N]`.
+> **Citation data format:** Each citation entry includes:
+> - `cite_text` / `normalized`: the citation string
+> - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
+> - `url`: official source URL (ndcourts.gov direct link)
+> - `search_hint`: text to match within the file (e.g., `2024ND156`)
+>
+> **Lookup order (try each in sequence):**
+>
+> 1. **Local files (fastest, most complete):** If `local_exists` is `true`, use the Read tool on `local_path`. Paragraphs are marked `[¶N]`.
+>
+> 2. **ndcourts.gov (primary web fallback):** If `local_exists` is `false`, use WebFetch on the `url` from the citation data. If the direct URL fails, fall back to the search endpoint:
+>    ```
+>    https://www.ndcourts.gov/supreme-court/opinions?cit1=YYYY&citType=ND&cit2=NNN&pageSize=10&sortOrder=1
+>    ```
+>    The search page returns case name, citation, and **highlight text** — a syllabus-like summary of key holdings. Mark the source as "ndcourts.gov (highlight)".
+>
+> 3. **CourtListener search API (secondary web fallback):** If ndcourts.gov fails, use WebFetch:
+>    ```
+>    https://www.courtlistener.com/api/rest/v4/search/?q=%22YYYY+ND+NNN%22&type=o
+>    ```
+>    Returns JSON (no auth required) with `caseName`, `neutralCite`, `syllabus`. Match on `neutralCite` exactly. Mark the source as "CourtListener (syllabus)".
+>
+>    **Limitations of web fallbacks:** Both web sources provide summary text, not full opinions. Pinpoint paragraph verification is not possible.
 >
 > **Citations to verify:**
-> [Insert numbered list of citations with the proposition each is cited for]
+> [Insert citation entries from citations.json, plus the proposition each is cited for in the briefs]
 >
 > **Prioritization:** Focus on opinions cited for standards of review and contested holdings first. If the list exceeds 15 citations, skip string cites (citations grouped in a series without individual discussion).
 >
 > **For each citation:**
 >
-> 1. **Locate the file.** If the file does not exist, mark as "File not found" and move on.
-> 2. **Read the cited paragraph** (the pinpoint ¶, plus 1-2 surrounding paragraphs for context). If no pinpoint, skim the full opinion.
-> 3. **Extract the holding and key rule** from the cited paragraph(s).
-> 4. **Assess support:** Does the cited paragraph actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, or **Does not support**.
+> 1. **Locate the opinion.** Use `local_path` if `local_exists`, then `url`, then CourtListener. If none produces a result, mark as "Not found" and move on.
+> 2. **Read the cited paragraph** (local: the pinpoint ¶, plus 1-2 surrounding paragraphs for context; web: use the syllabus and snippet). If no pinpoint and using local files, skim the full opinion.
+> 3. **Extract the holding and key rule** from the cited paragraph(s) or syllabus.
+> 4. **Assess support:** Does the cited paragraph (or syllabus) actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, **Does not support**, or **Insufficient data** (when the web fallback syllabus is too sparse to assess).
 > 5. **Standard of review:** If the opinion articulates a standard of review, note it.
 >
 > **Return two sections:**
 >
 > **A. Citation Verification Table:**
 >
-> | Citation | Cited For | File Found | Supports? | Holding/Key Rule | Standard of Review |
-> | -------- | --------- | ---------- | --------- | ---------------- | ------------------ |
+> | Citation | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
+> | -------- | --------- | ------ | --------- | ---------------- | ------------------ |
+>
+> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener (syllabus)", or "Not found".
 >
 > **B. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.
 
 ### Agent E: Statutory, Administrative Code & Court Rule Verification (Conditional)
 
-**Launch only if** N.D.C.C., N.D.A.C., or court rule citations were found in Step 1.
+**Launch only if** `citations.json` contains entries with `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, or `nd_const`.
 
 **Reads:** local markdown files from `~/refs/ndcc/`, `~/refs/ndac/`, and `~/refs/rule/`
+
+**Input:** Pass Agent E the filtered list of statutory/regulatory/rule entries from `citations.json`. Each entry includes `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
 > **Statutory, Administrative Code & Court Rule Verification**
 >
-> You have a list of N.D.C.C., N.D.A.C., and/or court rule citations extracted from appellate briefs. For each citation, look up the text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
+> You have a list of N.D.C.C., N.D.A.C., N.D. Constitution, and/or court rule citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
 >
-> **Local file locations (check these first — fastest):**
+> **Citation data format:** Each citation entry includes:
+> - `cite_text` / `normalized`: the citation string
+> - `cite_type`: `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, or `nd_const`
+> - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
+> - `url`: official source URL (ndlegis.gov, ndcourts.gov, etc.)
+> - `search_hint`: text to search for within the local file (e.g., `14-07.1-02`)
 >
-> - **N.D.C.C.:** `~/refs/ndcc/title-<T>/chapter-<T>-<CC>.md` — where `<T>` is the title and `<CC>` is the chapter portion of the section number. For example, N.D.C.C. § 14-07.1-02 is in `~/refs/ndcc/title-14/chapter-14-07.1.md`. Sections appear as `### §` headings within the chapter file.
-> - **N.D.A.C.:** `~/refs/ndac/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` — where `<T>` is the title, `<AA>` is the article, and `<CC>` is the chapter. For example, N.D.A.C. § 75-02-01.2-01 is in `~/refs/ndac/title-75/article-75-02/chapter-75-02-01.2.md`. Some small articles are a single file: `~/refs/ndac/title-<T>/article-<T>-<AA>.md`.
+> **Lookup order:**
 >
-> - **Court Rules:** `~/refs/rule/<category>/rule-<number>.md` — map the citation prefix to the directory:
->>   - N.D.R.App.P. → `ndrappp/`, N.D.R.Civ.P. → `ndrcivp/`, N.D.R.Crim.P. → `ndrcrimp/`, N.D.R.Ev. → `ndrev/`, N.D.R.Ct. → `ndrct/`, N.D.R.Juv.P. → `ndrjuvp/`, N.D.Sup.Ct.Admin.R. → `ndsupctadminr/`, N.D.R.Prof.Conduct → `ndrprofconduct/`, N.D.Code.Jud.Conduct → `ndcodejudconduct/`
->>   - Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`, then search within the file for subsection (b).
+> 1. **Local files (fastest):** If `local_exists` is `true`, use the Read tool on `local_path`. Search for the `search_hint` value within the file to find the specific section. Sections appear as `### §` headings within chapter files. For court rules, search for the subsection (e.g., `(b)`) within the rule file.
 >
-> **Web fallback:** If `~/refs/ndcc/` or `~/refs/ndac/` does not exist, fall back to:
-> - N.D.C.C.: WebFetch `https://www.ndlegis.gov/cencode/t{title}c{chapter}.html`
-> - N.D.A.C.: WebFetch `https://www.ndlegis.gov/information/acdata/html/{title}-{article}-{chapter}.html`
-> - Court Rules: WebFetch `https://www.ndcourts.gov/legal-resources/rules/{category}/{rule-number}` (if `~/refs/rule/` is absent)
+> 2. **Web fallback:** If `local_exists` is `false`, use WebFetch on the `url` from the citation data.
 >
 > **Citations to verify:**
-> [Insert numbered list of citations with the proposition each is cited for, and any quoted language from the briefs]
+> [Insert citation entries from citations.json, plus the proposition each is cited for and any quoted language from the briefs]
 >
 > **For each citation:**
 >
-> 1. **Locate the section.** Read the chapter file and search for the `### §` heading. If the file or section does not exist, mark as "Not found" and move on.
+> 1. **Locate the section.** Use `local_path` if `local_exists`, otherwise WebFetch the `url`. If neither works, mark as "Not found" and move on.
 > 2. **Extract the relevant text** of the cited subsection.
 > 3. **Assess support:** Does the section actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, or **Does not support**.
 > 4. **Quote verification:** If the brief quotes the statute or rule, compare the quoted text against the actual text. Report: **Accurate**, **Minor discrepancy** (with details), or **Inaccurate** (with details).
@@ -500,34 +533,17 @@ Write the memo to a file in the current working directory:
 
 ### Step 7: Citation Verification (Optional)
 
-If the user requests verification (or if you want to flag potential issues), verify citations using these sources in order:
+If the user requests verification (or if you want to flag potential issues), run the citation checker on the finished memo:
 
-#### ND Case Citations (YYYY ND ###)
+```bash
+python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} --refs-dir ~/refs
+```
 
-1. **Local opinions** (fastest) — check if `~/refs/opin/markdown/{year}/{year}ND{number}.md` exists
-2. **ND Courts website** — use WebFetch to search `https://www.ndcourts.gov/supreme-court/opinions?search={citation}`
-3. **CourtListener** — if the user has a CourtListener API key, use the verification script
+The human-readable output shows total citations found, how many resolve locally vs. web-only vs. unresolved, grouped by type.
 
-#### ND Century Code Citations (N.D.C.C. §)
+For JSON output (to inspect individual citations), add `--json`.
 
-1. **Local markdown** (fastest) — read `~/refs/ndcc/title-<T>/chapter-<T>-<CC>.md` and search for the `### §` heading
-2. **ND Legislature** (fallback) — use WebFetch to check `https://www.ndlegis.gov/cencode/t{title}c{chapter}.html`
-
-#### ND Administrative Code Citations (N.D.A.C. §)
-
-1. **Local markdown** (fastest) — read `~/refs/ndac/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` and search for the `### §` heading
-2. **ND Legislature** (fallback) — use WebFetch to check `https://www.ndlegis.gov/information/acdata/html/{title}-{article}-{chapter}.html`
-
-#### ND Court Rule Citations
-
-1. **Local markdown** (fastest) — read `~/refs/rule/<category>/rule-<number>.md` and search for the subsection
-2. **ND Courts** (fallback) — use WebFetch to check `https://www.ndcourts.gov/legal-resources/rules/<category>/<rule-number>`
-
-#### What to Skip
-
-- Record citations (R##) — these reference the appellate record, not verifiable online
-
-After verification, append a verification summary to the memo:
+After verification, append a summary to the memo:
 
 ```
 ## CITATION VERIFICATION
@@ -537,6 +553,8 @@ Verified: X | Unverified: Y | Skipped: Z
 ### Unverified Citations
 - [list any citations that could not be confirmed]
 ```
+
+Record citations (R##) reference the appellate record and are not checked by the script.
 
 ---
 
