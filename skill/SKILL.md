@@ -67,6 +67,8 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 
 ### Step 0: Scan, Classify, and Split
 
+**Update check:** Run `python3 ~/.claude/skills/jetmemo/scripts/check_update.py` silently. If it prints output, include it as a note to the user.
+
 1. **Scan** the working directory for `.pdf` files.
 
 2. **Classify** each PDF — read just the first 2 pages (use the Read tool on the PDF) to determine document type:
