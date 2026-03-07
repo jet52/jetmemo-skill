@@ -108,10 +108,13 @@ unzip rule.zip -d ~/refs/rule
 | [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/ndac/` | Administrative rule verification |
 | [rule.zip](https://ndconst.org/_media/tools/rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
 
-If `~/refs/ndcc/`, `~/refs/ndac/`, or `~/refs/rule/` are missing, the skill falls back to web lookups. There is currently no web fallback for opinion lookups.
+If `~/refs/` subdirectories are missing, the skill falls back to web lookups (ndcourts.gov, then CourtListener). Web fallbacks provide syllabus/highlight summaries but not full opinion text, so pinpoint paragraph verification is only available with local files.
 
 ## Other Dependencies
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | Split PDF packets by bookmark | Recommended |
+| [jetcite](https://github.com/jet52/jetcite) | Citation extraction and resolution | Required |
+
+**jetcite** powers the citation checker (`verify_citations.py`). Install as a Claude skill from the GitHub repo, or via pip: `pip install git+https://github.com/jet52/jetcite.git`.
