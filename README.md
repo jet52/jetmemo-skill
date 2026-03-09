@@ -1,8 +1,8 @@
 # JetMemo Skill
 
-Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Analyzes briefs, notices of appeal, and orders to produce structured bench memos for oral argument preparation.
+Generate bench memos from appellate case PDFs. Analyzes briefs, notices of appeal, and orders to produce structured bench memos for oral argument preparation.
 
-## Caution: Privacy Settings Before Use
+## Caution: Privacy Settings Before Use (turn off use of training data)
 
 <img width="541" height="137" alt="Screenshot 2026-03-07 at 15 31 25" src="https://github.com/user-attachments/assets/b552ef6a-0e66-41f1-91b8-21b02e49b76d" />
 
