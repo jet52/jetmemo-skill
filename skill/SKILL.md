@@ -142,7 +142,7 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
    ```
 
    The output is a JSON array. Each entry has `cite_type`, `local_path`, `local_exists`, `url`, and `search_hint`. Use `cite_type` to determine which agents to launch:
-   - Any `cite_type` of `nd_case` → launch Agent D
+   - Any `cite_type` in `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, `state_neutral` → launch Agent D
    - Any `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, `nd_const` → launch Agent E
 
 ---
@@ -339,50 +339,70 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 ### Agent D: Precedent Lookup (Conditional)
 
-**Launch only if** `citations.json` contains entries with `cite_type` of `nd_case`.
+**Launch only if** `citations.json` contains entries with `cite_type` in `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, or `state_neutral`.
 
-**Reads:** local opinion markdown files (preferred), ndcourts.gov (fallback), CourtListener search API (secondary fallback)
+**Reads:** local opinion markdown files (preferred), web sources via jetcite-provided URLs (fallback)
 
-**Input:** Pass Agent D the filtered list of `nd_case` entries from `citations.json`. Each entry includes `local_path`, `local_exists`, `url`, and `search_hint`.
+**Input:** Pass Agent D the filtered list of case citation entries from `citations.json` — all entries where `cite_type` is `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, or `state_neutral`. Each entry includes `cite_type`, `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
-> **ND Precedent Verification**
+> **Precedent Verification**
 >
-> You have a list of ND Supreme Court citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the opinion and extract relevant information.
+> You have a list of case citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the opinion and extract relevant information.
 >
 > **Citation data format:** Each citation entry includes:
 > - `cite_text` / `normalized`: the citation string
+> - `cite_type`: one of `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, `state_neutral`
 > - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
-> - `url`: official source URL (ndcourts.gov direct link)
-> - `search_hint`: text to match within the file (e.g., `2024ND156`)
+> - `url`: source URL (ndcourts.gov, CourtListener, Justia, etc.)
+> - `search_hint`: text to match within the file
 >
-> **Lookup order (try each in sequence):**
+> ---
+>
+> **Lookup strategy by citation type:**
+>
+> **ND cases (`nd_case`):**
 >
 > 1. **Local files (fastest, most complete):** If `local_exists` is `true`, use the Read tool on `local_path`. Paragraphs are marked `[¶N]`.
->
 > 2. **ndcourts.gov (primary web fallback):** If `local_exists` is `false`, use WebFetch on the `url` from the citation data. If the direct URL fails, fall back to the search endpoint:
 >    ```
 >    https://www.ndcourts.gov/supreme-court/opinions?cit1=YYYY&citType=ND&cit2=NNN&pageSize=10&sortOrder=1
 >    ```
 >    The search page returns case name, citation, and **highlight text** — a syllabus-like summary of key holdings. Mark the source as "ndcourts.gov (highlight)".
->
-> 3. **CourtListener search API (secondary web fallback):** If ndcourts.gov fails, use WebFetch:
+> 3. **CourtListener search API (secondary web fallback):** Use WebFetch:
 >    ```
 >    https://www.courtlistener.com/api/rest/v4/search/?q=%22YYYY+ND+NNN%22&type=o
 >    ```
 >    Returns JSON (no auth required) with `caseName`, `neutralCite`, `syllabus`. Match on `neutralCite` exactly. Mark the source as "CourtListener (syllabus)".
 >
->    **Limitations of web fallbacks:** Both web sources provide summary text, not full opinions. Pinpoint paragraph verification is not possible.
+> **U.S. Supreme Court (`us_supreme_court`):**
+>
+> 1. **Local files:** If `local_exists` is `true`, read from `local_path`.
+> 2. **Justia / CourtListener:** Use WebFetch on the `url` field. The URL typically points to Justia (`supreme.justia.com`) or CourtListener. Mark the source as "Justia" or "CourtListener".
+>
+> **Federal reporters (`federal_reporter`) and state cases (`state_case`, `state_neutral`):**
+>
+> 1. **Local files:** If `local_exists` is `true`, read from `local_path`.
+> 2. **CourtListener:** Use WebFetch on the `url` field. CourtListener redirect URLs (`courtlistener.com/c/...`) resolve to the opinion page. Mark the source as "CourtListener".
+> 3. **CourtListener search API (if redirect URL fails):** Use WebFetch:
+>    ```
+>    https://www.courtlistener.com/api/rest/v4/search/?q=%22{search_hint}%22&type=o
+>    ```
+>    Returns JSON with `caseName`, `citation`, `syllabus`. Mark the source as "CourtListener (syllabus)".
+>
+> ---
+>
+> **Limitations of web fallbacks:** Web sources typically provide summary text (syllabus, headnotes), not full opinions. Pinpoint paragraph verification is not possible from web summaries.
 >
 > **Citations to verify:**
 > [Insert citation entries from citations.json, plus the proposition each is cited for in the briefs]
 >
-> **Prioritization:** Focus on opinions cited for standards of review and contested holdings first. If the list exceeds 15 citations, skip string cites (citations grouped in a series without individual discussion).
+> **Prioritization:** Focus on opinions cited for standards of review and contested holdings first. If the list exceeds 15 citations, skip string cites (citations grouped in a series without individual discussion). Prioritize ND cases (most relevant to this court's precedent), then U.S. Supreme Court cases, then federal and state cases.
 >
 > **For each citation:**
 >
-> 1. **Locate the opinion.** Use `local_path` if `local_exists`, then `url`, then CourtListener. If none produces a result, mark as "Not found" and move on.
+> 1. **Locate the opinion.** Use `local_path` if `local_exists`, then `url`, then CourtListener search. If none produces a result, mark as "Not found" and move on.
 > 2. **Read the cited paragraph** (local: the pinpoint ¶, plus 1-2 surrounding paragraphs for context; web: use the syllabus and snippet). If no pinpoint and using local files, skim the full opinion.
 > 3. **Extract the holding and key rule** from the cited paragraph(s) or syllabus.
 > 4. **Assess support:** Does the cited paragraph (or syllabus) actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, **Does not support**, or **Insufficient data** (when the web fallback syllabus is too sparse to assess).
@@ -392,10 +412,10 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **A. Citation Verification Table:**
 >
-> | Citation | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
-> | -------- | --------- | ------ | --------- | ---------------- | ------------------ |
+> | Citation | Type | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
+> | -------- | ---- | --------- | ------ | --------- | ---------------- | ------------------ |
 >
-> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener (syllabus)", or "Not found".
+> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found".
 >
 > **B. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.
