@@ -43,6 +43,12 @@ def main():
     # Check dependencies
     warnings = 0
 
+    # Required: pdftotext (Poppler) and pypdf
+    if not shutil.which("pdftotext"):
+        print("WARNING: pdftotext not found (Poppler)")
+        print("  Install with: brew install poppler  (macOS)")
+        warnings += 1
+
     try:
         subprocess.run(
             [sys.executable, "-c", "import pypdf"],
@@ -53,6 +59,32 @@ def main():
         print("WARNING: pypdf Python package not found")
         print("  Install with: pip install pypdf")
         warnings += 1
+
+    # Optional PDF extractors (improve text extraction quality)
+    optional_deps = {
+        "PyMuPDF": ("import fitz", "pip install pymupdf"),
+        "pdfplumber": ("import pdfplumber", "pip install pdfplumber"),
+        "marker": (None, "pip install marker-pdf"),  # checked via CLI
+    }
+    optional_missing = []
+    for name, (import_check, install_cmd) in optional_deps.items():
+        if name == "marker":
+            if not shutil.which("marker_single"):
+                optional_missing.append((name, install_cmd))
+        else:
+            try:
+                subprocess.run(
+                    [sys.executable, "-c", import_check],
+                    capture_output=True,
+                    check=True,
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                optional_missing.append((name, install_cmd))
+
+    if optional_missing:
+        print(f"\nOptional PDF extractors not found (text extraction will still work):")
+        for name, install_cmd in optional_missing:
+            print(f"  {name}: {install_cmd}")
 
     refs_dir = Path.home() / "refs"
     for name, description in REF_DIRS.items():
