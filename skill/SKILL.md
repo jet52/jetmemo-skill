@@ -116,24 +116,22 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
    - `~/.claude/skills/jetmemo/references/style-spec.md`
    - `~/.claude/skills/jetmemo/references/memo-format.md`
 
-2. **Extract text** from all PDFs using `pdftotext`:
+2. **Extract text** from all PDFs using the smart extraction script, which tries multiple PDF libraries in priority order and picks the best result:
 
    ```bash
-   pdftotext <file>.pdf <file>.txt
+   python3 ~/.claude/skills/jetmemo/scripts/extract_text.py <file1>.pdf <file2>.pdf ...
    ```
 
-3. **Quality check:** Mark a document as `needs_visual_read: true` in the manifest if **any** of these conditions are met:
-   - The `.txt` file is nearly empty (< 100 characters) for a multi-page PDF
-   - The average words per line is < 3 (indicates OCR degradation where individual words land on separate lines)
-   - The text contains a high ratio of garbled characters or encoding artifacts
+   The script tries extractors in this order: `pdftotext` (Poppler) → `pypdf` → `PyMuPDF` → `pdfplumber` → `marker`. Each page is scored individually. It stops as soon as one extractor produces good output (≥ 70% of text-bearing pages score ≥ 5 words/line). If only marginal output is found, it uses the best available. The script writes two files per PDF:
 
-   Quick check for line-to-word ratio:
+   - `<file>.txt` — extracted text
+   - `<file>.extraction.json` — per-page quality metadata including `visual_read_pages` (1-indexed page numbers that need visual read) and `visual_read_ranges` (compact string like `"31-40, 45"`)
 
-   ```bash
-   awk '{words+=NF; lines++} END {if(lines>0) printf "%.1f words/line\n", words/lines}' file.txt
-   ```
+   Exit codes:
+   - **0:** usable text was extracted for all PDFs
+   - **1:** one or more PDFs failed extraction entirely — mark those as `needs_visual_read: true` in the manifest
 
-   When `needs_visual_read` is set, the agent prompt **must** receive the PDF path (not the `.txt` path) with explicit instructions: "Use the Read tool on this PDF directly, reading page by page."
+   When specific pages need visual read (listed in `.extraction.json`), the agent prompt **must** receive both the `.txt` path and the PDF path, with instructions: "Pages [ranges] had poor text extraction. Use the Read tool on the PDF directly for those pages."
 
 4. **Extract citation list:** Run the citation checker on all `.txt` files to build a structured citation list. This determines which conditional agents to launch.
 
@@ -584,7 +582,7 @@ Record citations (R##) reference the appellate record and are not checked by the
 
 | Content           | Strategy                                  | Rationale                            |
 | ----------------- | ----------------------------------------- | ------------------------------------ |
-| Briefs (30-50pp)  | `pdftotext` -> `.txt`, agent reads text   | ~50% token savings vs multimodal PDF |
+| Briefs (30-50pp)  | `extract_text.py` -> `.txt`, agent reads text | ~50% token savings vs multimodal PDF |
 | Large record PDFs | `splitmarks` first, then extract per-file | Agents load only relevant documents  |
 | Scanned PDFs      | Agent uses `Read` on PDF directly         | Fallback when text extraction fails  |
 | ND opinions       | Agent reads `.md` directly                | Already markdown, very efficient     |
@@ -595,7 +593,7 @@ Record citations (R##) reference the appellate record and are not checked by the
 ## Fallback Handling
 
 - If a subagent fails or times out: orchestrator reads the document directly in main context and performs that analysis step itself
-- If `pdftotext` produces empty output or poor quality (avg < 3 words/line): mark `needs_visual_read` and pass the PDF path to the subagent with explicit instructions to use the Read tool on the PDF directly
+- If `extract_text.py` exits with code 1 for a PDF (all extractors produced poor quality): mark `needs_visual_read` and pass the PDF path to the subagent with explicit instructions to use the Read tool on the PDF directly
 - If `splitmarks` finds no bookmarks: document stays intact, processed as-is
 - If `splitmarks` output still contains large multi-item files: process as-is, but note in the manifest that granular splitting was not possible
 - If >50% of documents fail text extraction: abandon parallel approach, fall back to sequential multimodal reads
