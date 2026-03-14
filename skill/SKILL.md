@@ -551,7 +551,19 @@ Write the memo to a file in the current working directory:
 - Default filename: `{case_number}_memo.md` (e.g., `20250319_memo.md`)
 - If the user specifies a different output path, use that
 
-### Step 7: Citation Verification (Optional)
+### Step 7: Generate Word Document
+
+Convert the markdown memo to a formatted .docx file matching the Court's bench memo template (QTPalatine 13pt, justified, 1.2 line spacing):
+
+```bash
+python3 ~/.claude/skills/jetmemo/scripts/memo_to_docx.py {memo_file}
+```
+
+This produces `{case_number}_memo.docx` alongside the markdown file. The docx uses the same styles as the Court's bench memos: Title, Address Block (with tab-aligned metadata), Heading 1 (centered section heads), Heading 2 (issue headings), Heading 3 (sub-arguments), and Main Body Text. Page numbers appear in the footer.
+
+If python-docx is not installed, the script will print an error. Install with `pip install python-docx`.
+
+### Step 8: Citation Verification (Optional)
 
 If the user requests verification (or if you want to flag potential issues), run the citation checker on the finished memo:
 
