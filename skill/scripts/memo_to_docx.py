@@ -254,6 +254,15 @@ def setup_styles(doc, heading_num_id, body_num_id):
     h3.paragraph_format.line_spacing = 1.0
     _link_style_to_numbering(h3, heading_num_id, ilvl=2)
 
+    # --- Hyperlink ---
+    try:
+        hl = doc.styles["Hyperlink"]
+    except KeyError:
+        from docx.enum.style import WD_STYLE_TYPE
+        hl = doc.styles.add_style("Hyperlink", WD_STYLE_TYPE.CHARACTER)
+    hl.font.color.rgb = None  # inherit default (Word applies blue automatically)
+    hl.font.underline = True
+
     return doc
 
 
@@ -323,33 +332,65 @@ def setup_page(doc):
 # ---------------------------------------------------------------------------
 # Inline markdown parsing
 # ---------------------------------------------------------------------------
-# Splits text into segments: (text, bold, italic)
+# Splits text into segments: links, bold italic, bold, italic, plain, leftover
 _INLINE_RE = re.compile(
-    r"(\*\*\*(.+?)\*\*\*"   # ***bold italic***
-    r"|\*\*(.+?)\*\*"       # **bold**
-    r"|\*(.+?)\*"           # *italic*
-    r"|([^*]+)"             # plain text
-    r"|(\*+))"              # leftover asterisks
+    r"(\[([^\]]+)\]\(([^)]+)\)"  # [text](url) — markdown link
+    r"|\*\*\*(.+?)\*\*\*"       # ***bold italic***
+    r"|\*\*(.+?)\*\*"           # **bold**
+    r"|\*(.+?)\*"               # *italic*
+    r"|([^*\[]+)"               # plain text (stop at * or [)
+    r"|(\*+)"                    # leftover asterisks
+    r"|(\[))"                    # leftover bracket
 )
+
+
+def _add_hyperlink(paragraph, text, url):
+    """Add a hyperlink run to a paragraph."""
+    part = paragraph.part
+    r_id = part.relate_to(
+        url,
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    hyperlink = parse_xml(
+        f'<w:hyperlink {nsdecls("w", "r")} r:id="{r_id}">'
+        f'  <w:r>'
+        f'    <w:rPr>'
+        f'      <w:rStyle w:val="Hyperlink"/>'
+        f'    </w:rPr>'
+        f'    <w:t xml:space="preserve">{_xml_escape(text)}</w:t>'
+        f'  </w:r>'
+        f'</w:hyperlink>'
+    )
+    paragraph._element.append(hyperlink)
+
+
+def _xml_escape(text):
+    """Escape XML special characters."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def add_formatted_runs(paragraph, text):
     """Parse markdown inline formatting and add runs to the paragraph."""
     for m in _INLINE_RE.finditer(text):
-        if m.group(2):  # bold italic
-            r = paragraph.add_run(m.group(2))
-            r.bold = True
-            r.italic = True
-        elif m.group(3):  # bold
-            r = paragraph.add_run(m.group(3))
-            r.bold = True
-        elif m.group(4):  # italic
+        if m.group(2):  # markdown link [text](url)
+            _add_hyperlink(paragraph, m.group(2), m.group(3))
+        elif m.group(4):  # bold italic
             r = paragraph.add_run(m.group(4))
+            r.bold = True
             r.italic = True
-        elif m.group(5):  # plain
-            paragraph.add_run(m.group(5))
-        elif m.group(6):  # leftover asterisks
-            paragraph.add_run(m.group(6))
+        elif m.group(5):  # bold
+            r = paragraph.add_run(m.group(5))
+            r.bold = True
+        elif m.group(6):  # italic
+            r = paragraph.add_run(m.group(6))
+            r.italic = True
+        elif m.group(7):  # plain
+            paragraph.add_run(m.group(7))
+        elif m.group(8):  # leftover asterisks
+            paragraph.add_run(m.group(8))
+        elif m.group(9):  # leftover bracket
+            paragraph.add_run(m.group(9))
 
 
 # ---------------------------------------------------------------------------

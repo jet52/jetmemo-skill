@@ -111,6 +111,8 @@ Include only exhibits where the parties disagree about significance, or that are
 #### BACKGROUND
 
 - Every factual assertion must have a record citation: (R##), (R##:page), (R##:page:¶para)
+- Record citations must be hyperlinked — see style-spec.md for URL format
+- Never use "para." or "paras." — always use ¶ / ¶¶
 - Include both factual and procedural history
 - Chronological order is typical
 
@@ -169,3 +171,4 @@ state recommended disposition.}
 - **Never** use "I" or "we"
 - **Never** omit record citations from BACKGROUND facts
 - **Never** present only one side's arguments without the other
+- **Never** use "para." or "paras." — always use the paragraph symbol ¶ (singular) or ¶¶ (plural)

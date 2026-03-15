@@ -42,10 +42,30 @@ N.D.R.Crim.P. 29        (Criminal Procedure)
 ```
 
 ### Paragraph References
-Use the paragraph symbol with a nonbreaking space:
+Always use the paragraph symbol (¶) — **never** write "para." or "paras." in any context:
 ```
 ¶ 1, ¶ 15
 ¶¶ 6-8
+```
+
+### Record Citation Hyperlinks
+
+In markdown output, every record citation should be a hyperlink to `record.ndcourts.gov`. The URL format is:
+
+```
+https://record.ndcourts.gov/{case_number}/{item}#page={page}
+```
+
+Examples (for case 20990001):
+```
+[R899](https://record.ndcourts.gov/20990001/899)
+[R899:2](https://record.ndcourts.gov/20990001/899#page=2)
+[R899:2:¶5](https://record.ndcourts.gov/20990001/899#page=2)
+```
+
+When a citation contains multiple record items, hyperlink each separately:
+```
+([R240](https://record.ndcourts.gov/20990001/240); [R268](https://record.ndcourts.gov/20990001/268))
 ```
 
 ## Citation Precision

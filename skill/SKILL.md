@@ -507,6 +507,17 @@ For each consolidated issue:
 
 ### Step 4: Generate the Memo
 
+**Record citation hyperlinking:** All record citations in the markdown output must be hyperlinks to `record.ndcourts.gov`. Use the case number from metadata to construct URLs:
+
+- `R45` → `[R45](https://record.ndcourts.gov/{case_number}/45)`
+- `R45:12` → `[R45:12](https://record.ndcourts.gov/{case_number}/45#page=12)`
+- `R45:12:¶15` → `[R45:12:¶15](https://record.ndcourts.gov/{case_number}/45#page=12)`
+
+When multiple record items appear together, hyperlink each separately:
+`([R240](https://record.ndcourts.gov/{case_number}/240); [R268](https://record.ndcourts.gov/{case_number}/268))`
+
+**Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural).
+
 Write the complete bench memo in markdown per `memo-format.md`:
 
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
