@@ -48,7 +48,113 @@ MARGIN_BOTTOM = Inches(1)
 TAB_STOP = Inches(1)
 
 
-def setup_styles(doc):
+def setup_numbering(doc):
+    """Create numbering definitions matching the bench memo template.
+
+    Returns (heading_num_id, body_num_id) for linking to paragraphs.
+    """
+    # Ensure numbering part exists
+    numbering_part = doc.part.numbering_part
+    numbering_elm = numbering_part._element
+
+    # --- Abstract numbering 0: Heading multilevel list ---
+    heading_abstract = parse_xml(
+        f'<w:abstractNum {nsdecls("w")} w:abstractNumId="10">'
+        '  <w:multiLevelType w:val="multilevel"/>'
+        '  <w:lvl w:ilvl="0">'
+        '    <w:start w:val="1"/>'
+        '    <w:numFmt w:val="none"/>'
+        '    <w:pStyle w:val="Heading1"/>'
+        '    <w:suff w:val="nothing"/>'
+        '    <w:lvlText w:val=""/>'
+        '    <w:lvlJc w:val="center"/>'
+        '    <w:pPr><w:ind w:left="0" w:firstLine="0"/></w:pPr>'
+        '    <w:rPr><w:rFonts w:hint="default"/></w:rPr>'
+        '  </w:lvl>'
+        '  <w:lvl w:ilvl="1">'
+        '    <w:start w:val="1"/>'
+        '    <w:numFmt w:val="upperRoman"/>'
+        '    <w:pStyle w:val="Heading2"/>'
+        '    <w:lvlText w:val="%2."/>'
+        '    <w:lvlJc w:val="left"/>'
+        '    <w:pPr><w:ind w:left="720" w:hanging="720"/></w:pPr>'
+        '    <w:rPr><w:rFonts w:hint="default"/></w:rPr>'
+        '  </w:lvl>'
+        '  <w:lvl w:ilvl="2">'
+        '    <w:start w:val="1"/>'
+        '    <w:numFmt w:val="upperLetter"/>'
+        '    <w:pStyle w:val="Heading3"/>'
+        '    <w:lvlText w:val="%3."/>'
+        '    <w:lvlJc w:val="right"/>'
+        '    <w:pPr><w:ind w:left="1440" w:hanging="720"/></w:pPr>'
+        '    <w:rPr><w:rFonts w:hint="default"/></w:rPr>'
+        '  </w:lvl>'
+        '</w:abstractNum>'
+    )
+    numbering_elm.append(heading_abstract)
+
+    # --- Abstract numbering 1: Body text [¶N] numbering ---
+    body_abstract = parse_xml(
+        f'<w:abstractNum {nsdecls("w")} w:abstractNumId="11">'
+        '  <w:multiLevelType w:val="hybridMultilevel"/>'
+        '  <w:lvl w:ilvl="0">'
+        '    <w:start w:val="1"/>'
+        '    <w:numFmt w:val="decimal"/>'
+        '    <w:pStyle w:val="MainBodyText"/>'
+        '    <w:lvlText w:val="[&#182;%1]"/>'
+        '    <w:lvlJc w:val="left"/>'
+        '    <w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr>'
+        '    <w:rPr><w:rFonts w:hint="default"/></w:rPr>'
+        '  </w:lvl>'
+        '</w:abstractNum>'
+    )
+    numbering_elm.append(body_abstract)
+
+    # --- Concrete numbering instances ---
+    heading_num = parse_xml(
+        f'<w:num {nsdecls("w")} w:numId="10">'
+        '  <w:abstractNumId w:val="10"/>'
+        '</w:num>'
+    )
+    numbering_elm.append(heading_num)
+
+    body_num = parse_xml(
+        f'<w:num {nsdecls("w")} w:numId="11">'
+        '  <w:abstractNumId w:val="11"/>'
+        '</w:num>'
+    )
+    numbering_elm.append(body_num)
+
+    return 10, 11  # heading_num_id, body_num_id
+
+
+def _link_style_to_numbering(style, num_id, ilvl=0):
+    """Add numPr to a style's pPr element."""
+    ppr = style.element.find(qn('w:pPr'))
+    if ppr is None:
+        ppr = parse_xml(f'<w:pPr {nsdecls("w")}/>')
+        style.element.append(ppr)
+    num_pr = parse_xml(
+        f'<w:numPr {nsdecls("w")}>'
+        f'  <w:ilvl w:val="{ilvl}"/>'
+        f'  <w:numId w:val="{num_id}"/>'
+        '</w:numPr>'
+    )
+    ppr.append(num_pr)
+
+
+def _force_font(style, font_name):
+    """Force a style's font, removing any theme font overrides."""
+    style.font.name = font_name
+    rpr = style.element.find(qn('w:rPr'))
+    if rpr is not None:
+        rfonts = rpr.find(qn('w:rFonts'))
+        if rfonts is not None:
+            for attr in ('w:asciiTheme', 'w:hAnsiTheme', 'w:eastAsiaTheme', 'w:cstheme'):
+                rfonts.attrib.pop(qn(attr), None)
+
+
+def setup_styles(doc, heading_num_id, body_num_id):
     """Configure document styles to match the bench memo template."""
     # --- Normal ---
     normal = doc.styles["Normal"]
@@ -62,7 +168,7 @@ def setup_styles(doc):
 
     # --- Title ---
     title = doc.styles["Title"]
-    title.font.name = FONT_NAME
+    _force_font(title, FONT_NAME)
     title.font.size = FONT_SIZE
     title.font.bold = False
     title.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -72,7 +178,7 @@ def setup_styles(doc):
 
     # --- Heading 1 (centered section heads: BACKGROUND, CONCLUSION) ---
     h1 = doc.styles["Heading 1"]
-    h1.font.name = FONT_NAME
+    _force_font(h1, FONT_NAME)
     h1.font.size = FONT_SIZE
     h1.font.bold = False
     h1.font.color.rgb = None  # inherit (black)
@@ -80,10 +186,11 @@ def setup_styles(doc):
     h1.paragraph_format.space_after = NORMAL_SPACE_AFTER
     h1.paragraph_format.space_before = Pt(0)
     h1.paragraph_format.line_spacing = LINE_SPACING
+    _link_style_to_numbering(h1, heading_num_id, ilvl=0)
 
     # --- Heading 2 (issue headings: I., II.) ---
     h2 = doc.styles["Heading 2"]
-    h2.font.name = FONT_NAME
+    _force_font(h2, FONT_NAME)
     h2.font.size = FONT_SIZE
     h2.font.bold = True
     h2.font.color.rgb = None
@@ -91,10 +198,11 @@ def setup_styles(doc):
     h2.paragraph_format.space_after = NORMAL_SPACE_AFTER
     h2.paragraph_format.space_before = Pt(0)
     h2.paragraph_format.line_spacing = LINE_SPACING
+    _link_style_to_numbering(h2, heading_num_id, ilvl=1)
 
     # --- Heading 3 (sub-arguments: A., B.) ---
     h3 = doc.styles["Heading 3"]
-    h3.font.name = FONT_NAME
+    _force_font(h3, FONT_NAME)
     h3.font.size = FONT_SIZE
     h3.font.bold = True
     h3.font.color.rgb = None
@@ -102,6 +210,7 @@ def setup_styles(doc):
     h3.paragraph_format.space_after = BODY_SPACE_AFTER
     h3.paragraph_format.space_before = Pt(0)
     h3.paragraph_format.line_spacing = 1.0
+    _link_style_to_numbering(h3, heading_num_id, ilvl=2)
 
     return doc
 
@@ -125,7 +234,7 @@ def add_address_block_style(doc):
     return ab
 
 
-def add_body_style(doc):
+def add_body_style(doc, body_num_id):
     """Create the Main Body Text style if it doesn't exist."""
     styles = doc.styles
     try:
@@ -141,6 +250,8 @@ def add_body_style(doc):
     mbt.paragraph_format.left_indent = Inches(0)
     mbt.paragraph_format.line_spacing = LINE_SPACING
     mbt.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # Link to [¶N] auto-numbering
+    _link_style_to_numbering(mbt, body_num_id, ilvl=0)
     return mbt
 
 
@@ -332,6 +443,43 @@ def strip_para_number(text):
     return text, None
 
 
+def strip_heading_number(text):
+    """Remove manual numbering prefix from heading text.
+
+    Strips Roman numeral prefixes (I., II., III.) from H2 headings and
+    letter prefixes (A., B., C.) from H3 headings, since Word's numbering
+    definitions supply these automatically.
+    """
+    # Roman numeral prefix: "I. ", "II. ", "IV. ", etc.
+    m = re.match(r"^[IVXLC]+\.\s+", text)
+    if m:
+        return text[m.end():]
+    # Letter prefix: "A. ", "B. ", etc.
+    m = re.match(r"^[A-Z]\.\s+", text)
+    if m:
+        return text[m.end():]
+    return text
+
+
+def _suppress_numbering(paragraph):
+    """Override paragraph numbering with numId=0 to suppress auto-number."""
+    ppr = paragraph._element.find(qn('w:pPr'))
+    if ppr is None:
+        ppr = parse_xml(f'<w:pPr {nsdecls("w")}/>')
+        paragraph._element.insert(0, ppr)
+    # Remove existing numPr if present
+    existing = ppr.find(qn('w:numPr'))
+    if existing is not None:
+        ppr.remove(existing)
+    num_pr = parse_xml(
+        f'<w:numPr {nsdecls("w")}>'
+        '  <w:ilvl w:val="0"/>'
+        '  <w:numId w:val="0"/>'
+        '</w:numPr>'
+    )
+    ppr.append(num_pr)
+
+
 def convert(md_path, docx_path):
     """Convert a markdown bench memo to docx."""
     md_text = Path(md_path).read_text(encoding="utf-8")
@@ -342,9 +490,10 @@ def convert(md_path, docx_path):
 
     # Create document and set up styles
     doc = Document()
-    setup_styles(doc)
+    heading_num_id, body_num_id = setup_numbering(doc)
+    setup_styles(doc, heading_num_id, body_num_id)
     add_address_block_style(doc)
-    add_body_style(doc)
+    add_body_style(doc, body_num_id)
     setup_page(doc)
 
     # Remove the default empty paragraph
@@ -414,7 +563,7 @@ def convert(md_path, docx_path):
             in_quick_ref = content.strip().lower() == "quick reference"
             if content.strip().lower().startswith("key exhibits"):
                 # Key Exhibits heading - use Heading 2
-                p = doc.add_paragraph(content, style="Heading 2")
+                p = doc.add_paragraph(strip_heading_number(content), style="Heading 2")
                 i += 1
                 continue
             if in_quick_ref:
@@ -424,12 +573,12 @@ def convert(md_path, docx_path):
             if is_section_heading(content):
                 p = doc.add_paragraph(content, style="Heading 1")
             else:
-                p = doc.add_paragraph(content, style="Heading 2")
+                p = doc.add_paragraph(strip_heading_number(content), style="Heading 2")
             i += 1
             continue
 
         if line_type == "h3":
-            p = doc.add_paragraph(content, style="Heading 3")
+            p = doc.add_paragraph(strip_heading_number(content), style="Heading 3")
             in_quick_ref = False
             i += 1
             continue
@@ -450,6 +599,7 @@ def convert(md_path, docx_path):
                     break
             # In Quick Reference, use body text with a bullet character
             p = doc.add_paragraph(style="Main Body Text")
+            _suppress_numbering(p)
             p.paragraph_format.space_after = NORMAL_SPACE_AFTER
             add_formatted_runs(p, "• " + text)
             continue
@@ -457,7 +607,11 @@ def convert(md_path, docx_path):
         if line_type == "blockquote":
             text, _pn = strip_para_number(content)
             p = doc.add_paragraph(style="Main Body Text")
+            _suppress_numbering(p)
+            p.paragraph_format.left_indent = BLOCK_QUOTE_INDENT
             p.paragraph_format.first_line_indent = BLOCK_QUOTE_INDENT
+            p.paragraph_format.right_indent = BLOCK_QUOTE_INDENT
+            p.paragraph_format.line_spacing = 1.0
             add_formatted_runs(p, text)
             i += 1
             continue
