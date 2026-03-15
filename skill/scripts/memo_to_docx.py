@@ -154,8 +154,50 @@ def _force_font(style, font_name):
                 rfonts.attrib.pop(qn(attr), None)
 
 
+def set_doc_defaults(doc, font_name, font_size):
+    """Set document-level default font in w:docDefaults so all styles inherit it."""
+    styles_elm = doc.styles.element
+    doc_defaults = styles_elm.find(qn('w:docDefaults'))
+    if doc_defaults is None:
+        doc_defaults = parse_xml(f'<w:docDefaults {nsdecls("w")}/>')
+        styles_elm.insert(0, doc_defaults)
+    rpr_default = doc_defaults.find(qn('w:rPrDefault'))
+    if rpr_default is None:
+        rpr_default = parse_xml(f'<w:rPrDefault {nsdecls("w")}/>')
+        doc_defaults.append(rpr_default)
+    rpr = rpr_default.find(qn('w:rPr'))
+    if rpr is None:
+        rpr = parse_xml(f'<w:rPr {nsdecls("w")}/>')
+        rpr_default.append(rpr)
+    # Set font, removing any theme attributes
+    rfonts = rpr.find(qn('w:rFonts'))
+    if rfonts is None:
+        rfonts = parse_xml(f'<w:rFonts {nsdecls("w")}/>')
+        rpr.insert(0, rfonts)
+    rfonts.set(qn('w:ascii'), font_name)
+    rfonts.set(qn('w:hAnsi'), font_name)
+    rfonts.set(qn('w:eastAsia'), font_name)
+    rfonts.set(qn('w:cs'), font_name)
+    for attr in ('w:asciiTheme', 'w:hAnsiTheme', 'w:eastAsiaTheme', 'w:cstheme'):
+        rfonts.attrib.pop(qn(attr), None)
+    # Set font size
+    sz = rpr.find(qn('w:sz'))
+    if sz is None:
+        sz = parse_xml(f'<w:sz {nsdecls("w")}/>')
+        rpr.append(sz)
+    sz.set(qn('w:val'), str(int(font_size.pt * 2)))  # half-points
+    sz_cs = rpr.find(qn('w:szCs'))
+    if sz_cs is None:
+        sz_cs = parse_xml(f'<w:szCs {nsdecls("w")}/>')
+        rpr.append(sz_cs)
+    sz_cs.set(qn('w:val'), str(int(font_size.pt * 2)))
+
+
 def setup_styles(doc, heading_num_id, body_num_id):
     """Configure document styles to match the bench memo template."""
+    # Set document-level defaults so all styles inherit QTPalatine
+    set_doc_defaults(doc, FONT_NAME, FONT_SIZE)
+
     # --- Normal ---
     normal = doc.styles["Normal"]
     normal.font.name = FONT_NAME
