@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 2.7.1
+version: 2.7.2
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -174,6 +174,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > - Case number (format: YYYYNNNN, e.g., 20990001)
 > - Case name (Party v. Party)
+> - District court case number(s) (e.g., 00-0000-CV-00000) — look on the brief cover page, notice of appeal, or district court order caption. If multiple district court cases are consolidated in one appeal, list all of them with a note about which record items belong to each.
 > - Appellant name and counsel
 > - Appellee name and counsel
 > - Lower court (county, judge if available)
@@ -508,14 +509,16 @@ For each consolidated issue:
 
 ### Step 4: Generate the Memo
 
-**Record citation hyperlinking:** All record citations in the markdown output must be hyperlinks to `record.ndcourts.gov`. Use the case number from metadata to construct URLs:
+**Record citation hyperlinking:** All record citations in the markdown output must be hyperlinks to `record.ndcourts.gov`. Use the district court case number from metadata to construct URLs:
 
-- `R45` → `[R45](https://record.ndcourts.gov/{case_number}/45)`
-- `R45:12` → `[R45:12](https://record.ndcourts.gov/{case_number}/45#page=12)`
-- `R45:12:¶15` → `[R45:12:¶15](https://record.ndcourts.gov/{case_number}/45#page=12)`
+- `R45` → `[R45](https://record.ndcourts.gov/Case/{dc_docket}/45)`
+- `R45:12` → `[R45:12](https://record.ndcourts.gov/Case/{dc_docket}/45#page=12)`
+- `R45:12:¶15` → `[R45:12:¶15](https://record.ndcourts.gov/Case/{dc_docket}/45#page=12)`
 
 When multiple record items appear together, hyperlink each separately:
-`([R240](https://record.ndcourts.gov/{case_number}/240); [R268](https://record.ndcourts.gov/{case_number}/268))`
+`([R240](https://record.ndcourts.gov/Case/{dc_docket}/240); [R268](https://record.ndcourts.gov/Case/{dc_docket}/268))`
+
+When multiple district court cases are consolidated in one appeal, use the correct district court case number for each record item based on the mapping from Agent A's metadata.
 
 **Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural).
 

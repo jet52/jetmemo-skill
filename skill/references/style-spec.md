@@ -50,23 +50,25 @@ Always use the paragraph symbol (¶) — **never** write "para." or "paras." in 
 
 ### Record Citation Hyperlinks
 
-In markdown output, every record citation should be a hyperlink to `record.ndcourts.gov`. The URL format is:
+In markdown output, every record citation should be a hyperlink to `record.ndcourts.gov`. The URL format uses the district court case number (not the Supreme Court docket number):
 
 ```
-https://record.ndcourts.gov/{case_number}/{item}#page={page}
+https://record.ndcourts.gov/Case/{dc_docket}/{item}#page={page}
 ```
 
-Examples (for case 20990001):
+Examples (for district court case 00-0000-CV-00000):
 ```
-[R899](https://record.ndcourts.gov/20990001/899)
-[R899:2](https://record.ndcourts.gov/20990001/899#page=2)
-[R899:2:¶5](https://record.ndcourts.gov/20990001/899#page=2)
+[R899](https://record.ndcourts.gov/Case/00-0000-CV-00000/899)
+[R899:2](https://record.ndcourts.gov/Case/00-0000-CV-00000/899#page=2)
+[R899:2:¶5](https://record.ndcourts.gov/Case/00-0000-CV-00000/899#page=2)
 ```
 
 When a citation contains multiple record items, hyperlink each separately:
 ```
-([R240](https://record.ndcourts.gov/20990001/240); [R268](https://record.ndcourts.gov/20990001/268))
+([R240](https://record.ndcourts.gov/Case/00-0000-CV-00000/240); [R268](https://record.ndcourts.gov/Case/00-0000-CV-00000/268))
 ```
+
+When multiple district court cases are consolidated in one appeal, use the correct district court case number for each record item.
 
 ### Authority Citation Hyperlinks
 
