@@ -562,7 +562,17 @@ Write the memo to a file in the current working directory:
 - Default filename: `{case_number}_memo.md` (e.g., `20990001_memo.md`)
 - If the user specifies a different output path, use that
 
-### Step 7: Generate Word Document
+### Step 7: Link Authority Citations
+
+Hyperlink citations to authority in the memo markdown using URLs from `citations.json` (generated in Step 1). This converts bare citation text (e.g., `2024 ND 156`) into markdown links (e.g., `[2024 ND 156](url)`), so they become clickable in the docx output.
+
+```bash
+python3 ~/.claude/skills/jetmemo/scripts/link_citations.py {memo_file} citations.json
+```
+
+This modifies the markdown file in place. Citations already inside markdown links (e.g., record citations) are left untouched. If `citations.json` does not exist (e.g., citation extraction was skipped), skip this step.
+
+### Step 8: Generate Word Document
 
 Convert the markdown memo to a formatted .docx file matching the Court's bench memo template (QTPalatine 13pt, justified, 1.2 line spacing):
 
@@ -574,7 +584,7 @@ This produces `{case_number}_memo.docx` alongside the markdown file. The docx us
 
 If python-docx is not installed, the script will print an error. Install with `pip install python-docx`.
 
-### Step 8: Citation Verification (Optional)
+### Step 9: Citation Verification (Optional)
 
 If the user requests verification (or if you want to flag potential issues), run the citation checker on the finished memo:
 

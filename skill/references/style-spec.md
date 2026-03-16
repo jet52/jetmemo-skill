@@ -68,6 +68,18 @@ When a citation contains multiple record items, hyperlink each separately:
 ([R240](https://record.ndcourts.gov/20990001/240); [R268](https://record.ndcourts.gov/20990001/268))
 ```
 
+### Authority Citation Hyperlinks
+
+Citations to authority (case law, statutes, court rules, etc.) are hyperlinked automatically by the `link_citations.py` post-processing script using URLs from `citations.json`. The base citation text becomes the link text, with pinpoint references following outside the link:
+
+```
+[2024 ND 156](https://www.ndcourts.gov/...), ¶ 12
+[N.D.C.C. § 14-09-06.2](https://ndlegis.gov/...)
+[N.D.R.Civ.P. 56](https://www.ndcourts.gov/...)
+```
+
+Do not manually add authority citation links in the markdown — the script handles this.
+
 ## Citation Precision
 
 All citations — case law, record, statutory — should be as precise as possible:
