@@ -18,6 +18,7 @@ from pathlib import Path
 # Locate jetcite: pip install, skill directory, or bail with instructions.
 # ---------------------------------------------------------------------------
 _JETCITE_SKILL = Path.home() / ".claude" / "skills" / "jetcite-skill" / "src"
+_JETCITE_COWORK = Path.home() / ".skills" / "skills" / "jetcite" / "src"
 
 try:
     from jetcite import Citation, CitationType, scan_text
@@ -25,6 +26,13 @@ try:
 except ImportError:
     if _JETCITE_SKILL.is_dir():
         sys.path.insert(0, str(_JETCITE_SKILL))
+        try:
+            from jetcite import Citation, CitationType, scan_text
+            from jetcite.cache import _citation_path
+        except ImportError:
+            pass
+    if "jetcite" not in sys.modules and _JETCITE_COWORK.is_dir():
+        sys.path.insert(0, str(_JETCITE_COWORK))
         try:
             from jetcite import Citation, CitationType, scan_text
             from jetcite.cache import _citation_path
