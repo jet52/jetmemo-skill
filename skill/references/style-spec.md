@@ -35,10 +35,18 @@ N.D.R.Crim.P. 29        (Criminal Procedure)
 ```
 
 ### Record Citations
+
+**Single district court case:**
 ```
 (R45)                    Record document 45
 (R45:12)                 Record document 45, page 12
 (R45:12:¶15)             Record document 45, page 12, paragraph 15
+```
+
+**Multiple district court cases (Rule 30(b)(1)):** When the appeal involves more than one district court case, each record citation must identify which case it belongs to. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
+```
+First reference:         (00-0000-CV-00000 R55:22)
+Subsequent references:   (0856 R55:22)
 ```
 
 ### Paragraph References
@@ -56,7 +64,7 @@ In markdown output, every record citation should be a hyperlink to `record.ndcou
 https://record.ndcourts.gov/Case/{dc_docket}/{item}#page={page}
 ```
 
-Examples (for district court case 00-0000-CV-00000):
+**Single district court case** (e.g., 00-0000-CV-00000):
 ```
 [R899](https://record.ndcourts.gov/Case/00-0000-CV-00000/899)
 [R899:2](https://record.ndcourts.gov/Case/00-0000-CV-00000/899#page=2)
@@ -68,7 +76,11 @@ When a citation contains multiple record items, hyperlink each separately:
 ([R240](https://record.ndcourts.gov/Case/00-0000-CV-00000/240); [R268](https://record.ndcourts.gov/Case/00-0000-CV-00000/268))
 ```
 
-When multiple district court cases are consolidated in one appeal, use the correct district court case number for each record item.
+**Multiple district court cases (Rule 30(b)(1)):** When the appeal consolidates multiple district court cases, each record citation must identify which case it belongs to, and the URL must use that item's district court case number. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
+```
+First:  [00-0000-CV-00000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)
+Later:  [0856 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)
+```
 
 ### Authority Citation Hyperlinks
 

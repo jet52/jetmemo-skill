@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 2.8.0
+version: 2.8.1
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -518,7 +518,9 @@ For each consolidated issue:
 When multiple record items appear together, hyperlink each separately:
 `([R240](https://record.ndcourts.gov/Case/{dc_docket}/240); [R268](https://record.ndcourts.gov/Case/{dc_docket}/268))`
 
-When multiple district court cases are consolidated in one appeal, use the correct district court case number for each record item based on the mapping from Agent A's metadata.
+**Multiple district court cases (Rule 30(b)(1)):** When the appeal consolidates multiple district court cases, each record citation must identify which case the record item belongs to, using the mapping from Agent A's metadata. The URL must use that item's district court case number. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
+- First: `[00-0000-CV-00000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)`
+- Later: `[0856 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)`
 
 **Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural).
 

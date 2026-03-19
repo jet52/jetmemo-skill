@@ -111,6 +111,7 @@ Include only exhibits where the parties disagree about significance, or that are
 #### BACKGROUND
 
 - Every factual assertion must have a record citation: (R##), (R##:page), (R##:page:¶para)
+- When multiple district court cases are consolidated, prefix record cites with the district court case number per Rule 30(b)(1) — see style-spec.md
 - Record citations must be hyperlinked — see style-spec.md for URL format
 - Never use "para." or "paras." — always use ¶ / ¶¶
 - Include both factual and procedural history
