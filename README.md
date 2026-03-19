@@ -77,11 +77,16 @@ jetmemo-skill/
 ├── .gitignore
 └── skill/
     ├── SKILL.md
+    ├── lib/
+    │   └── jetcite/          ← bundled citation library
     ├── references/
     │   ├── memo-format.md
     │   └── style-spec.md
     └── scripts/
         ├── check_update.py
+        ├── extract_text.py
+        ├── link_citations.py
+        ├── memo_to_docx.py
         ├── splitmarks.py
         └── verify_citations.py
 ```
@@ -119,6 +124,6 @@ If `~/refs/` subdirectories are missing, the skill falls back to web lookups (nd
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | Split PDF packets by bookmark | Recommended |
-| [jetcite](https://github.com/jet52/jetcite) | Citation extraction and resolution | Required |
+| [jetcite](https://github.com/jet52/jetcite) | Citation extraction and resolution | Bundled |
 
-**jetcite** powers the citation checker (`verify_citations.py`). Install as a Claude skill from the GitHub repo, or via pip: `pip install git+https://github.com/jet52/jetcite.git`.
+**jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
