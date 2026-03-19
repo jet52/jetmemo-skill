@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 2.7.2
+version: 2.8.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -24,7 +24,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 
 > **Dependencies:**
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
-> - verify_citations.py requires `jetcite` — install as a Claude skill from [github.com/jet52/jetcite](https://github.com/jet52/jetcite) or via `pip install git+https://github.com/jet52/jetcite.git`
+> - verify_citations.py uses a bundled copy of `jetcite` (in `lib/jetcite/`); to update, run `make vendor-jetcite` from the project root
 
 ### ~/refs directory layout
 
