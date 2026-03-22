@@ -1,5 +1,6 @@
 SKILL_NAME := jetmemo
-ZIP_NAME := $(SKILL_NAME)-skill.zip
+VERSION := $(shell cat VERSION)
+ZIP_NAME := $(SKILL_NAME)-skill-v$(VERSION).zip
 JETCITE_SRC := ../jetcite/src/jetcite
 JETCITE_DEST := skill/lib/jetcite
 
@@ -29,7 +30,7 @@ vendor-jetcite:
 	@echo "Vendored jetcite from $(JETCITE_SRC)"
 
 clean:
-	rm -f $(ZIP_NAME)
+	rm -f $(SKILL_NAME)-skill*.zip
 
 install:
 	python3 install.py
