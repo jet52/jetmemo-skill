@@ -109,7 +109,7 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 
 5. **Build a manifest:** `{path, type, page_count}` for every document. Track this manifest for all subsequent steps.
 
-6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). This flag controls whether the memo includes a recommended disposition for each issue.
+6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). This flag controls whether the memo includes a preliminary staff recommendation for each issue. All recommendations must be phrased as preliminary assessments that defer to the Court's authority to decide. If there are close questions, the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
 ### Step 1: Read References and Extract Text
 
@@ -505,7 +505,7 @@ For each consolidated issue:
 3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
 4. **Assess preservation** — if there's a waiver/preservation dispute, analyze it before reaching the merits.
 5. **Flag statutory interpretation issues** — if the issue turns on statutory text, identify the interpretive question, the competing readings, and any relevant canons.
-6. **If `recommend_mode` is enabled**, determine recommended disposition — affirm, reverse, or remand, with reasoning. If disabled, end the analysis after presenting both sides' strongest positions without stating a preferred outcome.
+6. **If `recommend_mode` is enabled**, determine a preliminary recommended disposition — affirm, reverse, or remand — with reasoning. Frame the recommendation as a preliminary staff assessment, deferential to the Court's authority to decide. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If disabled, end the analysis after presenting both sides' strongest positions without stating a preferred outcome.
 
 ### Step 4: Generate the Memo
 
@@ -528,7 +528,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
 
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
 2. **Quick Reference** — 4-8 key documents with record citations (from Agent A)
-3. **Opening [¶1]** — summarize the case and identify all issues. If `recommend_mode`, **bold the recommendation**. Otherwise, state the key tension or question the case presents.
+3. **Opening [¶1]** — summarize the case and identify all issues. If `recommend_mode`, **bold the preliminary staff recommendation**. Otherwise, state the key tension or question the case presents.
 4. **BACKGROUND** — factual and procedural history with record citations for every assertion
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
    - Standard of review with case authority
@@ -536,7 +536,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
    - Appellee's arguments with citations
    - Sub-arguments (A, B, C) as needed
    - Analysis and assessment
-6. **CONCLUSION** — If `recommend_mode`, restate recommendation in **bold**. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
+6. **CONCLUSION** — If `recommend_mode`, restate the preliminary staff recommendation in **bold**, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
 
 ### Step 5: Self-Review
 
@@ -552,7 +552,8 @@ Review the memo against this checklist before presenting:
 - [ ] Each issue analysis identifies the strongest argument for and against the district court
 - [ ] Exhibit table included if ≥ 2 contested exhibits
 - [ ] Writ terminology used correctly if writ proceeding
-- [ ] If `recommend_mode`: recommendation appears in ¶1 (bold) and CONCLUSION (bold)
+- [ ] If `recommend_mode`: preliminary staff recommendation appears in ¶1 (bold) and CONCLUSION (bold), phrased as a preliminary assessment deferential to the Court
+- [ ] If `recommend_mode` with close questions: suggested oral argument questions appear in CONCLUSION
 - [ ] If not `recommend_mode`: memo does NOT state a preferred disposition; analysis ends with both sides' positions
 - [ ] No placeholder brackets like [Date], [page], [County]
 - [ ] Only citations that appear in the parties' briefs are used
@@ -641,7 +642,7 @@ Record citations (R##) reference the appellate record and are not checked by the
 
 - **Never fabricate citations.** Only cite cases and authorities that appear in the parties' briefs.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
-- **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be clearly stated but appropriately hedged. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
+- **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be phrased as preliminary staff assessments, clearly stated but deferential to the Court's authority to decide. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.
 - **Use "the Court"** when referring to the ND Supreme Court; **"the district court"** for the lower court.
 
