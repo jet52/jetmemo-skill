@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import platform
+import subprocess
 import sys
 import webbrowser
+from importlib.metadata import version
 from pathlib import Path
 
 import click
@@ -55,7 +58,31 @@ def _format_json(citations: list[Citation]) -> str:
     return json.dumps([c.to_dict() for c in citations], indent=2)
 
 
-@click.command()
+class DefaultGroup(click.Group):
+    """A click Group that falls through to a default command when no subcommand matches."""
+
+    def __init__(self, *args, default_cmd_name: str = "cite", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_cmd_name = default_cmd_name
+
+    def parse_args(self, ctx, args):
+        # If the first arg isn't a known subcommand, insert the default command name
+        if args and args[0] not in self.commands and not args[0].startswith("-"):
+            args = [self.default_cmd_name] + args
+        elif not args or (args[0].startswith("-") and args[0] not in ("--help", "--version")):
+            args = [self.default_cmd_name] + args
+        return super().parse_args(ctx, args)
+
+
+@click.group(cls=DefaultGroup, invoke_without_command=True)
+@click.version_option(version=version("jetcite"), prog_name="jetcite")
+@click.pass_context
+def main(ctx):
+    """Parse legal citations and generate URLs to official sources."""
+    pass
+
+
+@main.command(name="cite", hidden=True)
 @click.argument("citation", required=False)
 @click.option("--scan", "scan_file", type=str,
               help="Scan a document file for citations (use '-' for stdin).")
@@ -69,7 +96,7 @@ def _format_json(citations: list[Citation]) -> str:
               help="Check local reference cache at this directory.")
 @click.option("--fetch", "do_fetch", is_flag=True,
               help="Fetch citation content from web and cache locally (requires --refs-dir).")
-def main(
+def cite_cmd(
     citation: str | None,
     scan_file: str | None,
     fmt: str | None,
@@ -99,13 +126,27 @@ def main(
             fmt = "table"
     elif from_clipboard:
         try:
-            import pyperclip
-            citation = pyperclip.paste().strip()
-        except ImportError:
-            click.echo("Error: install pyperclip for clipboard support: pip install pyperclip",
-                        err=True)
+            system = platform.system()
+            if system == "Darwin":
+                result = subprocess.run(["pbpaste"], capture_output=True, text=True, check=True)
+            elif system == "Linux":
+                result = subprocess.run(
+                    ["xclip", "-selection", "clipboard", "-o"],
+                    capture_output=True, text=True, check=True,
+                )
+            elif system == "Windows":
+                result = subprocess.run(
+                    ["powershell", "-command", "Get-Clipboard"],
+                    capture_output=True, text=True, check=True,
+                )
+            else:
+                click.echo(f"Error: clipboard not supported on {system}", err=True)
+                sys.exit(1)
+            citation = result.stdout.strip()
+        except FileNotFoundError:
+            click.echo("Error: clipboard command not found (pbpaste/xclip/powershell)", err=True)
             sys.exit(1)
-        except pyperclip.PyperclipException as e:
+        except subprocess.CalledProcessError as e:
             click.echo(f"Error: could not read from clipboard: {e}", err=True)
             sys.exit(1)
 
@@ -156,6 +197,150 @@ def main(
     else:  # url
         for cite in citations:
             click.echo(_format_url(cite))
+
+
+@main.command()
+@click.argument("citation", required=False)
+@click.option("--file", "cache_file", type=str,
+              help="Scan a document and cache all citations.")
+@click.option("--refs-dir", type=click.Path(exists=False), default="~/refs",
+              help="Reference cache directory (default: ~/refs).")
+@click.option("--dry-run", is_flag=True,
+              help="Show what would be fetched without actually fetching.")
+@click.option("--status", is_flag=True,
+              help="Report cache status for each citation.")
+def cache(
+    citation: str | None,
+    cache_file: str | None,
+    refs_dir: str,
+    dry_run: bool,
+    status: bool,
+):
+    """Fetch citation content and cache locally.
+
+    Scan a document or look up a single citation, then fetch content
+    from the best available online source and cache it as markdown.
+
+    \b
+    Examples:
+      jetcite cache "585 N.W.2d 123"
+      jetcite cache --file opinion.md
+      jetcite cache --file opinion.md --dry-run
+      jetcite cache --file opinion.md --status
+    """
+    from jetcite.cache import (
+        fetch_and_cache,
+        is_stale,
+        read_meta,
+        resolve_local,
+    )
+
+    refs_path = Path(refs_dir).expanduser()
+
+    # Gather citations
+    if cache_file:
+        if cache_file == "-":
+            text = sys.stdin.read()
+        else:
+            with open(cache_file) as f:
+                text = f.read()
+        citations = scan_text(text, refs_dir=refs_path)
+    elif citation:
+        result = lookup(citation, refs_dir=refs_path)
+        if result:
+            citations = [result]
+        else:
+            click.echo(f"No citation pattern matched: {citation}", err=True)
+            sys.exit(1)
+    else:
+        # Try stdin
+        if not sys.stdin.isatty():
+            text = sys.stdin.read()
+            citations = scan_text(text, refs_dir=refs_path)
+        else:
+            click.echo("Usage: jetcite cache <citation> or jetcite cache --file <file>", err=True)
+            sys.exit(1)
+
+    if not citations:
+        click.echo("No citations found.")
+        return
+
+    # Status mode: report cache state
+    if status:
+        _print_cache_status(citations, refs_path, resolve_local, read_meta, is_stale)
+        return
+
+    # Dry-run or fetch mode
+    fetched = 0
+    skipped = 0
+    failed = 0
+
+    for cite in citations:
+        local = resolve_local(cite, refs_path)
+        if local and not is_stale(cite, local):
+            skipped += 1
+            if dry_run:
+                click.echo(f"  skip  {cite.normalized:<30} (cached)")
+            continue
+
+        if dry_run:
+            url = "(no URL)"
+            for s in cite.sources:
+                if s.name != "local":
+                    url = s.url
+                    break
+            click.echo(f"  fetch {cite.normalized:<30} <- {url}")
+        else:
+            cached = fetch_and_cache(cite, refs_dir=refs_path)
+            if cached:
+                fetched += 1
+                click.echo(f"  ok    {cite.normalized:<30} -> {cached}", err=True)
+            else:
+                failed += 1
+                click.echo(f"  FAIL  {cite.normalized}", err=True)
+
+    if not dry_run:
+        click.echo(
+            f"\n{fetched} cached, {skipped} already cached, {failed} failed "
+            f"({len(citations)} total)",
+            err=True,
+        )
+
+
+def _print_cache_status(citations, refs_path, resolve_local, read_meta, is_stale):
+    """Print cache status table for citations."""
+    lines = []
+    lines.append(f"  {'#':>3}  {'Citation':<30} {'Status':<10} {'Age':>6}  Source")
+    lines.append(f"  {'─' * 3}  {'─' * 30} {'─' * 10} {'─' * 6}  {'─' * 40}")
+
+    for i, cite in enumerate(citations, 1):
+        local = resolve_local(cite, refs_path)
+        if local:
+            meta = read_meta(local)
+            stale = is_stale(cite, local)
+            if meta and "fetched" in meta:
+                from datetime import datetime, timezone
+                fetched = datetime.fromisoformat(meta["fetched"])
+                age_days = (datetime.now(timezone.utc) - fetched).days
+                age_str = f"{age_days}d"
+            else:
+                age_str = "?"
+            status_str = "stale" if stale else "cached"
+            source = meta.get("source_url", "") if meta else ""
+        else:
+            status_str = "missing"
+            age_str = ""
+            source = ""
+            for s in cite.sources:
+                if s.name != "local":
+                    source = s.url
+                    break
+
+        lines.append(
+            f"  {i:>3}  {cite.normalized:<30} {status_str:<10} {age_str:>6}  {source}"
+        )
+
+    click.echo("\n".join(lines))
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -145,8 +146,12 @@ def cache_content(
     refs_dir: Path | None = None,
     source_url: str | None = None,
     content_type: str = "text/markdown",
+    raw_html: str | None = None,
 ) -> Path | None:
     """Write content to the local cache and create a .meta.json sidecar.
+
+    If raw_html is provided, writes a .html sibling file alongside the
+    markdown for archival purposes.
 
     Returns the path written, or None if the citation can't be mapped to a path.
     """
@@ -160,6 +165,11 @@ def cache_content(
     full = refs_dir / rel
     full.parent.mkdir(parents=True, exist_ok=True)
     full.write_text(content, encoding="utf-8")
+
+    # Write raw HTML sibling if available
+    if raw_html:
+        html_path = full.with_suffix(".html")
+        html_path.write_text(raw_html, encoding="utf-8")
 
     # Write sidecar metadata
     meta = {
@@ -209,6 +219,45 @@ def add_local_source(citation: Citation, path: Path) -> None:
     citation.sources.insert(0, Source(name="local", url=local_url))
 
 
+def _get_extractor(url: str):
+    """Return a source-specific content extractor for the given URL, or None."""
+    host = urlparse(url).netloc
+    _EXTRACTORS = {
+        "www.courtlistener.com": "courtlistener",
+        "supreme.justia.com": "justia",
+    }
+    source_key = _EXTRACTORS.get(host)
+    if source_key == "courtlistener":
+        from jetcite.sources.courtlistener import fetch_courtlistener
+        return fetch_courtlistener
+    elif source_key == "justia":
+        from jetcite.sources.justia import fetch_justia
+        return fetch_justia
+    return None
+
+
+def _fetch_generic(
+    source_url: str,
+    citation: Citation,
+    timeout: float = 10.0,
+) -> tuple[str | None, dict]:
+    """Generic fetcher: download and convert HTML via markdownify."""
+    try:
+        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout)
+        resp.raise_for_status()
+    except (httpx.HTTPError, httpx.TimeoutException):
+        return None, {}
+
+    content = resp.text
+    content_type = resp.headers.get("content-type", "text/html").split(";")[0].strip()
+
+    if content_type == "text/html":
+        from markdownify import markdownify
+        content = markdownify(content, strip=["img", "script", "style"]).strip()
+
+    return content, {}
+
+
 def fetch_and_cache(
     citation: Citation,
     refs_dir: Path | None = None,
@@ -216,8 +265,9 @@ def fetch_and_cache(
 ) -> Path | None:
     """Fetch citation content from its primary web source and cache locally.
 
-    Downloads the content at the citation's first non-local source URL,
-    writes it to the cache, and adds a local Source to the citation.
+    Uses source-specific extractors for known hosts (CourtListener, Justia)
+    to produce well-formatted markdown. Falls back to generic markdownify
+    for unknown sources.
 
     Returns the cached file path, or None if fetching fails or the
     citation can't be mapped to a cache path.
@@ -231,33 +281,37 @@ def fetch_and_cache(
         add_local_source(citation, existing)
         return existing
 
-    # Find a web source URL
+    # Find a web source URL and try source-specific extractors first
+    content = None
+    raw_html = None
     source_url = None
+
     for s in citation.sources:
-        if s.name != "local":
+        if s.name == "local":
+            continue
+        extractor = _get_extractor(s.url)
+        if extractor is not None:
+            content, _meta, raw_html = extractor(s.url, citation, timeout)
+            if content:
+                source_url = s.url
+                break
+
+    # If no source-specific extractor worked, fall back to generic
+    if content is None:
+        for s in citation.sources:
+            if s.name == "local":
+                continue
             source_url = s.url
             break
-    if source_url is None:
+        if source_url is None:
+            return None
+        content, _meta = _fetch_generic(source_url, citation, timeout)
+
+    if not content:
         return None
-
-    # Fetch
-    try:
-        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout)
-        resp.raise_for_status()
-    except (httpx.HTTPError, httpx.TimeoutException):
-        return None
-
-    content = resp.text
-    content_type = resp.headers.get("content-type", "text/html").split(";")[0].strip()
-
-    # Convert HTML to markdown for readable caching
-    if content_type == "text/html":
-        from markdownify import markdownify
-        content = markdownify(content, strip=["img", "script", "style"]).strip()
-        content_type = "text/markdown"
 
     path = cache_content(citation, content, refs_dir, source_url=source_url,
-                         content_type=content_type)
+                         content_type="text/markdown", raw_html=raw_html)
     if path is not None:
         add_local_source(citation, path)
     return path
