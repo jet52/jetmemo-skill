@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 2.8.2
+version: 2.9.1
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -67,6 +67,8 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 3
 ## Phase 1: Preparation (Orchestrator, Sequential)
 
 ### Step 0: Scan, Classify, and Split
+
+**Refs setup:** Run `python3 ~/.claude/skills/jetmemo/scripts/ensure_refs.py`. If it prints output, include it as a note to the user. This is a no-op when `~/refs` already exists (e.g., in Claude Code); in Cowork it detects a mounted `refs` folder and symlinks `~/refs` to it.
 
 **Update check:** Run `python3 ~/.claude/skills/jetmemo/scripts/check_update.py` silently. If it prints output, include it as a note to the user.
 

@@ -119,6 +119,10 @@ unzip rule.zip -d ~/refs/rule
 
 If `~/refs/` subdirectories are missing, the skill falls back to web lookups (ndcourts.gov, then CourtListener). Web fallbacks provide syllabus/highlight summaries but not full opinion text, so pinpoint paragraph verification is only available with local files.
 
+### Cowork (sandboxed environments)
+
+In Cowork, `~/refs` doesn't persist across sessions. To use local references, mount your `refs` directory via the Cowork folder picker. At startup the skill auto-detects a mounted folder named `refs` and symlinks `~/refs` to it — no manual setup needed.
+
 ## Other Dependencies
 
 | Dependency | Purpose | Required? |

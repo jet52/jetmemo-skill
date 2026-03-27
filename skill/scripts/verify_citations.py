@@ -25,14 +25,24 @@ if _BUNDLED_LIB.is_dir():
 try:
     from jetcite import Citation, CitationType, scan_text
     from jetcite.cache import _citation_path
-except ImportError:
-    print(
-        "ERROR: jetcite not found. Expected bundled copy at:\n"
-        f"  {_BUNDLED_LIB / 'jetcite'}\n"
-        "Run 'make vendor-jetcite' to re-vendor, or install via pip:\n"
-        "  pip install git+https://github.com/jet52/jetcite.git",
-        file=sys.stderr,
-    )
+except ImportError as e:
+    _jetcite_dir = _BUNDLED_LIB / "jetcite"
+    if not _jetcite_dir.is_dir():
+        print(
+            "ERROR: jetcite not found. Expected bundled copy at:\n"
+            f"  {_jetcite_dir}\n"
+            "Run 'make vendor-jetcite' to re-vendor, or install via pip:\n"
+            "  pip install git+https://github.com/jet52/jetcite.git",
+            file=sys.stderr,
+        )
+    else:
+        dep = e.name if hasattr(e, "name") and e.name else str(e)
+        print(
+            f"ERROR: jetcite found at {_jetcite_dir} but failed to import:\n"
+            f"  {e}\n"
+            f"Install the missing dependency:  pip install {dep}",
+            file=sys.stderr,
+        )
     sys.exit(1)
 
 # ---------------------------------------------------------------------------
