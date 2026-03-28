@@ -7,17 +7,6 @@ import re
 import httpx
 
 
-def _ensure_bs4():
-    """Install beautifulsoup4 on demand if not already available."""
-    try:
-        import bs4  # noqa: F401
-    except ImportError:
-        import subprocess, sys
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "-q", "beautifulsoup4"]
-        )
-
-
 def us_reports_url(volume: str, page: str) -> str:
     """Generate a Justia URL for a U.S. Reports citation."""
     return f"https://supreme.justia.com/cases/federal/us/{volume}/{page}"
@@ -40,7 +29,6 @@ def fetch_justia(
     except (httpx.HTTPError, httpx.TimeoutException):
         return None, {}, None
 
-    _ensure_bs4()
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -116,7 +104,6 @@ def _extract_text(element) -> str:
 
 def _collect_blocks(element, blocks: list[str]) -> None:
     """Collect text blocks from the DOM tree."""
-    _ensure_bs4()
     from bs4 import NavigableString, Tag
 
     if isinstance(element, NavigableString):

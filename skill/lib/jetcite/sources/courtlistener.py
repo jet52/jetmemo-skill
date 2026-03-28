@@ -25,18 +25,6 @@ from urllib.parse import quote
 
 import httpx
 
-
-def _ensure_bs4():
-    """Install beautifulsoup4 on demand if not already available."""
-    try:
-        import bs4  # noqa: F401
-    except ImportError:
-        import subprocess, sys
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "-q", "beautifulsoup4"]
-        )
-
-
 _CL_BASE = "https://www.courtlistener.com"
 _LOOKUP_URL = f"{_CL_BASE}/api/rest/v4/citation-lookup/"
 _SEARCH_URL = f"{_CL_BASE}/api/rest/v4/search/"
@@ -76,7 +64,6 @@ def _clean_html_to_markdown(html: str) -> str:
     a fixed set of tags. This avoids dropping content wrapped in <div>, <span>,
     or bare text nodes.
     """
-    _ensure_bs4()
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, "html.parser")
@@ -121,7 +108,6 @@ def _walk_to_markdown(element) -> str:
 
 def _collect_blocks(element, blocks: list[str], depth: int) -> None:
     """Collect text blocks from the DOM tree."""
-    _ensure_bs4()
     from bs4 import NavigableString, Tag
 
     if isinstance(element, NavigableString):
@@ -457,7 +443,6 @@ def _fetch_via_scrape(
     except (httpx.HTTPError, httpx.TimeoutException):
         return None, {}, None
 
-    _ensure_bs4()
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(resp.text, "html.parser")

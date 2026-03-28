@@ -159,6 +159,36 @@ Then the strongest counterargument. Then assessment. If recommend_mode,
 state recommended disposition.}
 ```
 
+#### Interpretive Panel Section (Optional)
+
+When the jetpanel skill produces a condensed panel analysis for a close interpretive question, insert it after the issue's Analysis paragraph and before the next issue heading:
+
+```
+[¶N+6] **Analysis:** {Analysis paragraph as usual.}
+
+### Interpretive Panel: {Issue heading}
+
+**Question:** {The close interpretive question}
+
+**Panel Result:** {X-Y split or consensus, with methodology labels}
+
+**Formalist Position (MANNING, BARNETT-SOLUM-THOMAS):** {1-3 sentences}
+
+**Living Constitution / Pragmatist Position (STRAUSS, POSNER-BREYER):** {1-3 sentences}
+
+**Natural Law Position (VERMEULE):** {1-3 sentences}
+
+**Key Divergence:** {What methodological commitment produces the split}
+
+**Strongest Arguments Each Way:**
+- For {reading A}: {best argument with citation}
+- For {reading B}: {best argument with citation}
+
+## II. {Next Issue}
+```
+
+The panel section does not receive a paragraph number — it is a supplementary analysis block, not part of the sequential paragraph flow.
+
 #### CONCLUSION
 
 - 1-2 paragraphs maximum

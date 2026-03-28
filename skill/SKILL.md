@@ -13,10 +13,10 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | Resource               | Path                                                      |
 | ---------------------- | --------------------------------------------------------- |
 | This skill             | `~/.claude/skills/jetmemo/`                            |
-| ND opinions (markdown) | `~/refs/opin/markdown/`                                    |
-| ND Century Code        | `~/refs/ndcc/`                                             |
-| ND Admin Code          | `~/refs/ndac/`                                             |
-| ND Court Rules         | `~/refs/rule/`                                             |
+| ND opinions (markdown) | `~/refs/nd/opin/markdown/`                                    |
+| ND Century Code        | `~/refs/nd/code/`                                             |
+| ND Admin Code          | `~/refs/nd/regs/`                                             |
+| ND Court Rules         | `~/refs/nd/rule/`                                             |
 | Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
 | Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
 | Citation checker       | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
@@ -30,21 +30,21 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 
 All local reference material lives under `~/refs/`. This directory may or may not exist for a given user; always check before relying on it and fall back to web lookups when absent.
 
-**ND opinions** — `~/refs/opin/markdown/<year>/<year>ND<number>.md` (e.g., `2022/2022ND210.md`). Paragraphs are marked `[¶N]`.
+**ND opinions** — `~/refs/nd/opin/markdown/<year>/<year>ND<number>.md` (e.g., `2022/2022ND210.md`). Paragraphs are marked `[¶N]`.
 
-**ND Century Code (N.D.C.C.)** — `~/refs/ndcc/title-<T>/chapter-<T>-<CC>.md` where `<T>` is the title number and `<CC>` is the chapter number (with leading zero). Examples:
-- N.D.C.C. § 14-07.1-01 → `~/refs/ndcc/title-14/chapter-14-07.1.md`
-- N.D.C.C. § 12.1-02-02 → `~/refs/ndcc/title-12.1/chapter-12.1-02.md`
+**ND Century Code (N.D.C.C.)** — `~/refs/nd/code/title-<T>/chapter-<T>-<CC>.md` where `<T>` is the title number and `<CC>` is the chapter number (with leading zero). Examples:
+- N.D.C.C. § 14-07.1-01 → `~/refs/nd/code/title-14/chapter-14-07.1.md`
+- N.D.C.C. § 12.1-02-02 → `~/refs/nd/code/title-12.1/chapter-12.1-02.md`
 
 Each chapter file contains all sections in that chapter as `### § T-CC-SS` headings. To verify a specific section, read the chapter file and search for the section number.
 
-**ND Administrative Code (N.D.A.C.)** — `~/refs/ndac/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` where `<T>` is the title, `<AA>` is the article, and `<CC>` is the chapter. Some small articles are a single file: `~/refs/ndac/title-<T>/article-<T>-<AA>.md`. Examples:
-- N.D.A.C. § 75-02-01.2-01 → `~/refs/ndac/title-75/article-75-02/chapter-75-02-01.2.md`
-- N.D.A.C. § 75-07-01 → `~/refs/ndac/title-75/article-75-07.md` (single-file article)
+**ND Administrative Code (N.D.A.C.)** — `~/refs/nd/regs/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` where `<T>` is the title, `<AA>` is the article, and `<CC>` is the chapter. Some small articles are a single file: `~/refs/nd/regs/title-<T>/article-<T>-<AA>.md`. Examples:
+- N.D.A.C. § 75-02-01.2-01 → `~/refs/nd/regs/title-75/article-75-02/chapter-75-02-01.2.md`
+- N.D.A.C. § 75-07-01 → `~/refs/nd/regs/title-75/article-75-07.md` (single-file article)
 
 Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
 
-**ND Court Rules** — `~/refs/rule/<category>/rule-<number>.md`. Categories map from citation abbreviations:
+**ND Court Rules** — `~/refs/nd/rule/<category>/rule-<number>.md`. Categories map from citation abbreviations:
 
 | Citation prefix | Directory |
 | --------------- | --------- |
@@ -58,9 +58,9 @@ Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
 | N.D.R.Prof.Conduct | `ndrprofconduct/` |
 | N.D.Code.Jud.Conduct | `ndcodejudconduct/` |
 
-Example: N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 35.1 → `~/refs/rule/ndrappp/rule-35.1.md`. The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — read the whole file and search for the subsection.
+Example: N.D.R.Civ.P. 12(b) → `~/refs/nd/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 35.1 → `~/refs/nd/rule/ndrappp/rule-35.1.md`. The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — read the whole file and search for the subsection.
 
-**READ-ONLY access to `~/refs/` is pre-authorized.** All agents (including subagents) may read files from this directory without additional permission. Never modify, delete, or write to any file in this directory.
+**Read access to `~/refs/` is pre-authorized.** All agents (including subagents) may read files from this directory without additional permission. Do not modify or delete existing files. Adding new files is permitted only by jetcite's caching functions and scraper scripts.
 
 ---
 
@@ -426,7 +426,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 **Launch only if** `citations.json` contains entries with `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, or `nd_const`.
 
-**Reads:** local markdown files from `~/refs/ndcc/`, `~/refs/ndac/`, and `~/refs/rule/`
+**Reads:** local markdown files from `~/refs/nd/code/`, `~/refs/nd/regs/`, and `~/refs/nd/rule/`
 
 **Input:** Pass Agent E the filtered list of statutory/regulatory/rule entries from `citations.json`. Each entry includes `local_path`, `local_exists`, `url`, and `search_hint`.
 
@@ -508,6 +508,37 @@ For each consolidated issue:
 4. **Assess preservation** — if there's a waiver/preservation dispute, analyze it before reaching the merits.
 5. **Flag statutory interpretation issues** — if the issue turns on statutory text, identify the interpretive question, the competing readings, and any relevant canons.
 6. **If `recommend_mode` is enabled**, determine a preliminary recommended disposition — affirm, reverse, or remand — with reasoning. Frame the recommendation as a preliminary staff assessment, deferential to the Court's authority to decide. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If disabled, end the analysis after presenting both sides' strongest positions without stating a preferred outcome.
+
+### Step 3.5: Interpretive Panel (Optional)
+
+**Prerequisite:** The jetpanel skill must be installed at `~/.claude/skills/jetpanel/SKILL.md`. If it is not installed, skip this step silently.
+
+**Activation:** Run this step when ALL of the following are true:
+1. `recommend_mode` is enabled
+2. Step 3 identified a close interpretive question — one where the legal framing shows strong arguments on both sides of a statutory or constitutional interpretation issue, competing canons, or genuine textual ambiguity
+
+**How to invoke:** Spawn a subagent using the Agent tool with the following instructions:
+
+> Read the jetpanel skill at `~/.claude/skills/jetpanel/SKILL.md` and execute it in integration mode.
+>
+> **Question Presented:** {the close interpretive question from Step 3}
+>
+> **Provision at Issue:** {the statute, constitutional clause, or rule}
+>
+> **Competing Positions:**
+> - Position A: {appellant's reading with interpretive basis}
+> - Position B: {appellee's reading with interpretive basis}
+>
+> **Relevant Authority:**
+> {Key precedent from Agent D results, statutory text from Agent E results, with file paths and URLs}
+>
+> **Output mode:** integration — return the condensed "Interpretive Panel" section for insertion into a bench memo.
+
+The subagent returns a condensed panel section. Insert it into the memo after the relevant issue's Analysis paragraph (Step 4), before the next issue heading or CONCLUSION. Use the `### Interpretive Panel: {Issue heading}` format.
+
+**Multiple close questions:** If Step 3 flags more than one close interpretive question, spawn one panel subagent per question. Run them in parallel.
+
+**Token budget note:** Each panel invocation adds ~85-170K tokens via the subagent. This runs in a separate context and does not consume the main memo's context window, but the condensed output (~200-500 tokens per question) is inserted into the main context for memo generation.
 
 ### Step 4: Generate the Memo
 

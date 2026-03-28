@@ -95,27 +95,27 @@ jetmemo-skill/
 
 The skill uses local reference datasets for citation verification and precedent lookup. Without these, the memo will still generate but citation verification and precedent analysis will be limited.
 
-Download the reference archives from [ndconst.org/tools](https://ndconst.org/tools) and install to `~/refs/`:
+Download the reference archives from [ndconst.org/tools](https://ndconst.org/tools) and install to `~/refs/nd/`:
 
 ```bash
-mkdir -p ~/refs
+mkdir -p ~/refs/nd
 # Required for precedent verification (Agent D)
-unzip opin.zip -d ~/refs/opin
+unzip opin.zip -d ~/refs/nd/opin
 
 # Required for statutory verification (Agent E)
-unzip ndcc.zip -d ~/refs/ndcc
-unzip ndac.zip -d ~/refs/ndac
+unzip ndcc.zip -d ~/refs/nd/code
+unzip ndac.zip -d ~/refs/nd/regs
 
 # Required for court rule verification (Agent E)
-unzip rule.zip -d ~/refs/rule
+unzip rule.zip -d ~/refs/nd/rule
 ```
 
 | Archive | Contents | Install to | Purpose |
 |---------|----------|------------|---------|
-| [opin.zip](https://ndconst.org/_media/tools/opin.zip) | ND Supreme Court opinions (1997-present) | `~/refs/opin/` | Precedent lookup and citation verification |
-| [ndcc.zip](https://ndconst.org/_media/tools/ndcc.zip) | North Dakota Century Code | `~/refs/ndcc/` | Statutory text verification |
-| [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/ndac/` | Administrative rule verification |
-| [rule.zip](https://ndconst.org/_media/tools/rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
+| [opin.zip](https://ndconst.org/_media/tools/opin.zip) | ND Supreme Court opinions (1997-present) | `~/refs/nd/opin/` | Precedent lookup and citation verification |
+| [ndcc.zip](https://ndconst.org/_media/tools/ndcc.zip) | North Dakota Century Code | `~/refs/nd/code/` | Statutory text verification |
+| [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/nd/regs/` | Administrative rule verification |
+| [rule.zip](https://ndconst.org/_media/tools/rule.zip) | North Dakota Court Rules | `~/refs/nd/rule/` | Court rule verification |
 
 If `~/refs/` subdirectories are missing, the skill falls back to web lookups (ndcourts.gov, then CourtListener). Web fallbacks provide syllabus/highlight summaries but not full opinion text, so pinpoint paragraph verification is only available with local files.
 

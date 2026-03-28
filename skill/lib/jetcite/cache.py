@@ -30,7 +30,7 @@ DEFAULT_REFS_DIR = Path.home() / "refs"
 # Historical ND reporters stored under opin/ (before neutral citations)
 _ND_REPORTERS = frozenset({"N.W.", "N.W.2d", "N.D."})
 
-# Federal case reporters stored under federal/
+# Federal case reporters stored under us/
 _FEDERAL_REPORTERS = frozenset({
     "U.S.", "S. Ct.", "L. Ed.", "L. Ed. 2d",
     "F.", "F.2d", "F.3d", "F.4th",
@@ -50,9 +50,13 @@ def _reporter_dir(reporter: str) -> str:
 def _citation_path(citation: Citation) -> Path | None:
     """Map a citation to its relative path within the refs directory.
 
-    Three-tier layout for cases:
-      opin/     — ND cases (neutral cites + historical ND reporters)
-      federal/  — federal case reporters
+    Jurisdiction-namespaced layout:
+      nd/opin/  — ND cases (neutral cites + historical ND reporters)
+      nd/code/  — ND Century Code (statutes)
+      nd/regs/  — ND Administrative Code (regulations)
+      nd/cnst/  — ND Constitution
+      nd/rule/  — ND Court Rules
+      us/       — federal case reporters, USC, CFR
       reporter/ — all other state and regional reporters
 
     Returns None if the citation type/components don't map to a known path.
@@ -61,46 +65,42 @@ def _citation_path(citation: Citation) -> Path | None:
 
     if citation.cite_type == CitationType.CASE:
         if citation.jurisdiction == "nd" and "year" in c and "number" in c:
-            # ND neutral citation: opin/markdown/{year}/{year}ND{number}.md
-            return Path("opin/markdown") / c["year"] / f"{c['year']}ND{c['number']}.md"
+            return Path("nd/opin/markdown") / c["year"] / f"{c['year']}ND{c['number']}.md"
         elif "reporter" in c and "volume" in c and "page" in c:
             reporter = c["reporter"]
             rdir = _reporter_dir(reporter)
             if reporter in _ND_REPORTERS:
-                return Path("opin") / rdir / c["volume"] / f"{c['page']}.md"
+                return Path("nd/opin") / rdir / c["volume"] / f"{c['page']}.md"
             elif reporter in _FEDERAL_REPORTERS:
-                return Path("federal") / rdir / c["volume"] / f"{c['page']}.md"
+                return Path("us") / rdir / c["volume"] / f"{c['page']}.md"
             else:
                 return Path("reporter") / rdir / c["volume"] / f"{c['page']}.md"
         return None
 
     if citation.cite_type == CitationType.STATUTE:
         if citation.jurisdiction == "nd":
-            # NDCC: ndcc/title-{t}/chapter-{t}-{ch}.md
             if "title" in c and "chapter" in c:
                 t = f"{c['title']}.{c['title_dec']}" if c.get("title_dec") else c["title"]
                 ch = f"{c['chapter']}.{c['chapter_dec']}" if c.get("chapter_dec") else c["chapter"]
-                return Path("ndcc") / f"title-{t}" / f"chapter-{t}-{ch}.md"
+                return Path("nd/code") / f"title-{t}" / f"chapter-{t}-{ch}.md"
         elif "title" in c and "section" in c:
-            # USC: federal/usc/{title}/{section}.md
-            return Path("federal/usc") / c["title"] / f"{c['section']}.md"
+            return Path("us/usc") / c["title"] / f"{c['section']}.md"
         return None
 
     if citation.cite_type == CitationType.CONSTITUTION:
         if citation.jurisdiction == "nd":
             if "article" in c and "section" in c:
                 art_num = roman_to_int(c["article"])
-                return Path("cnst") / f"art-{art_num:02d}" / f"sec-{c['section']}.md"
+                return Path("nd/cnst") / f"art-{art_num:02d}" / f"sec-{c['section']}.md"
         return None
 
     if citation.cite_type == CitationType.REGULATION:
         if citation.jurisdiction == "nd" and all(k in c for k in ("part1", "part2", "part3")):
-            # NDAC: ndac/title-{p1}/article-{p1}-{p2}/chapter-{p1}-{p2}-{p3}.md
-            return (Path("ndac") / f"title-{c['part1']}"
+            return (Path("nd/regs") / f"title-{c['part1']}"
                     / f"article-{c['part1']}-{c['part2']}"
                     / f"chapter-{c['part1']}-{c['part2']}-{c['part3']}.md")
         elif "title" in c and "section" in c:
-            return Path("federal/cfr") / c["title"] / f"{c['section']}.md"
+            return Path("us/cfr") / c["title"] / f"{c['section']}.md"
         return None
 
     if citation.cite_type == CitationType.COURT_RULE:
@@ -116,7 +116,7 @@ def _citation_path(citation: Citation) -> Path | None:
                 filename = f"rule-{arabic}.md" if arabic else f"rule-{rule_parts[0]}.md"
             else:
                 filename = f"rule-{'.'.join(rule_parts)}.md"
-            return Path("rule") / rule_set / filename
+            return Path("nd/rule") / rule_set / filename
         return None
 
     return None
