@@ -7,6 +7,7 @@ and caches fetched content for future offline access.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -14,6 +15,8 @@ from urllib.parse import urlparse
 import httpx
 
 from jetcite.models import Citation, CitationType, Source
+
+USER_AGENT = "jetcite/1.5 (legal-research-tool; https://github.com/jet52/jetcite)"
 from jetcite.patterns.base import roman_to_int
 
 # Staleness thresholds in days — informational only, not auto-refetch
@@ -140,6 +143,17 @@ def resolve_local(citation: Citation, refs_dir: Path | None = None) -> Path | No
     return None
 
 
+def _refs_writable(refs_dir: Path) -> bool:
+    """Check whether the refs directory exists and is writable."""
+    try:
+        if refs_dir.is_dir():
+            return os.access(refs_dir, os.W_OK)
+        refs_dir.mkdir(parents=True, exist_ok=True)
+        return True
+    except OSError:
+        return False
+
+
 def cache_content(
     citation: Citation,
     content: str,
@@ -153,7 +167,11 @@ def cache_content(
     If raw_html is provided, writes a .html sibling file alongside the
     markdown for archival purposes.
 
-    Returns the path written, or None if the citation can't be mapped to a path.
+    Best-effort: returns None silently if the refs directory is missing,
+    read-only, or any write fails (e.g., sandboxed environments).
+
+    Returns the path written, or None if the citation can't be mapped to a
+    path or the write fails.
     """
     if refs_dir is None:
         refs_dir = DEFAULT_REFS_DIR
@@ -162,24 +180,30 @@ def cache_content(
     if rel is None:
         return None
 
+    if not _refs_writable(refs_dir):
+        return None
+
     full = refs_dir / rel
-    full.parent.mkdir(parents=True, exist_ok=True)
-    full.write_text(content, encoding="utf-8")
+    try:
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content, encoding="utf-8")
 
-    # Write raw HTML sibling if available
-    if raw_html:
-        html_path = full.with_suffix(".html")
-        html_path.write_text(raw_html, encoding="utf-8")
+        # Write raw HTML sibling if available
+        if raw_html:
+            html_path = full.with_suffix(".html")
+            html_path.write_text(raw_html, encoding="utf-8")
 
-    # Write sidecar metadata
-    meta = {
-        "citation": citation.normalized,
-        "source_url": source_url or (citation.sources[0].url if citation.sources else None),
-        "fetched": datetime.now(timezone.utc).isoformat(),
-        "content_type": content_type,
-    }
-    meta_path = full.with_suffix(full.suffix + ".meta.json")
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        # Write sidecar metadata
+        meta = {
+            "citation": citation.normalized,
+            "source_url": source_url or (citation.sources[0].url if citation.sources else None),
+            "fetched": datetime.now(timezone.utc).isoformat(),
+            "content_type": content_type,
+        }
+        meta_path = full.with_suffix(full.suffix + ".meta.json")
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    except OSError:
+        return None
 
     return full
 
@@ -243,7 +267,8 @@ def _fetch_generic(
 ) -> tuple[str | None, dict]:
     """Generic fetcher: download and convert HTML via markdownify."""
     try:
-        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout)
+        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout,
+                         headers={"User-Agent": USER_AGENT})
         resp.raise_for_status()
     except (httpx.HTTPError, httpx.TimeoutException):
         return None, {}
@@ -262,6 +287,7 @@ def fetch_and_cache(
     citation: Citation,
     refs_dir: Path | None = None,
     timeout: float = 10.0,
+    force: bool = False,
 ) -> Path | None:
     """Fetch citation content from its primary web source and cache locally.
 
@@ -269,15 +295,18 @@ def fetch_and_cache(
     to produce well-formatted markdown. Falls back to generic markdownify
     for unknown sources.
 
+    If force is True, re-fetches even when a local file already exists
+    (used for refreshing stale mutable content like statutes and regulations).
+
     Returns the cached file path, or None if fetching fails or the
     citation can't be mapped to a cache path.
     """
     if refs_dir is None:
         refs_dir = DEFAULT_REFS_DIR
 
-    # Don't fetch if already cached
+    # Don't fetch if already cached (unless forced)
     existing = resolve_local(citation, refs_dir)
-    if existing is not None:
+    if existing is not None and not force:
         add_local_source(citation, existing)
         return existing
 

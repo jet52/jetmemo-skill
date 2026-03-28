@@ -6,6 +6,8 @@ import re
 
 import httpx
 
+_USER_AGENT = "jetcite/1.5 (legal-research-tool; https://github.com/jet52/jetcite)"
+
 
 def us_reports_url(volume: str, page: str) -> str:
     """Generate a Justia URL for a U.S. Reports citation."""
@@ -23,7 +25,8 @@ def fetch_justia(
     Returns (markdown_content, metadata_dict, raw_html) or (None, {}, None) on failure.
     """
     try:
-        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout)
+        resp = httpx.get(source_url, follow_redirects=True, timeout=timeout,
+                         headers={"User-Agent": _USER_AGENT})
         if resp.status_code >= 400:
             return None, {}, None
     except (httpx.HTTPError, httpx.TimeoutException):

@@ -6,6 +6,8 @@ import re
 
 import httpx
 
+_USER_AGENT = "jetcite/1.5 (legal-research-tool; https://github.com/jet52/jetcite)"
+
 
 def nd_opinion_url(year: str, number: str) -> str:
     """Generate an ndcourts.gov search URL for an ND Supreme Court opinion.
@@ -33,7 +35,8 @@ def resolve_nd_opinion_url(year: str, number: str) -> str | None:
     """
     search_url = nd_opinion_url(year, number)
     try:
-        resp = httpx.get(search_url, follow_redirects=True, timeout=10.0)
+        resp = httpx.get(search_url, follow_redirects=True, timeout=10.0,
+                         headers={"User-Agent": _USER_AGENT})
         if resp.status_code >= 400:
             return None
     except (httpx.HTTPError, httpx.TimeoutException):

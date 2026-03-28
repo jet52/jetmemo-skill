@@ -25,6 +25,7 @@ from urllib.parse import quote
 
 import httpx
 
+_USER_AGENT = "jetcite/1.5 (legal-research-tool; https://github.com/jet52/jetcite)"
 _CL_BASE = "https://www.courtlistener.com"
 _LOOKUP_URL = f"{_CL_BASE}/api/rest/v4/citation-lookup/"
 _SEARCH_URL = f"{_CL_BASE}/api/rest/v4/search/"
@@ -40,10 +41,11 @@ def _get_token() -> str | None:
 
 def _auth_headers(token: str | None = None) -> dict:
     """Build auth headers if a token is available."""
+    headers = {"User-Agent": _USER_AGENT}
     t = token or _get_token()
     if t:
-        return {"Authorization": f"Token {t}"}
-    return {}
+        headers["Authorization"] = f"Token {t}"
+    return headers
 
 
 def courtlistener_url(reporter: str, volume: str, page: str) -> str:
@@ -232,7 +234,7 @@ def _fetch_via_citation_lookup(
     POST /api/rest/v4/citation-lookup/ with volume/reporter/page
     → cluster metadata → GET /api/rest/v4/opinions/<id>/ for text.
     """
-    headers = {"Authorization": f"Token {token}"}
+    headers = {"Authorization": f"Token {token}", "User-Agent": _USER_AGENT}
 
     # Step 1: Citation lookup
     try:
@@ -373,7 +375,7 @@ def _fetch_via_search(
             params=params,
             follow_redirects=True,
             timeout=timeout,
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "User-Agent": _USER_AGENT},
         )
         if resp.status_code >= 400:
             return None, {}, None
@@ -437,7 +439,8 @@ def _fetch_via_scrape(
 ) -> tuple[str | None, dict, str | None]:
     """Scrape opinion text by following a /c/ redirect URL."""
     try:
-        resp = httpx.get(url, follow_redirects=True, timeout=timeout)
+        resp = httpx.get(url, follow_redirects=True, timeout=timeout,
+                         headers={"User-Agent": _USER_AGENT})
         if resp.status_code >= 400:
             return None, {}, None
     except (httpx.HTTPError, httpx.TimeoutException):
