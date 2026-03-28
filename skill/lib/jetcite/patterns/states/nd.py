@@ -256,7 +256,7 @@ _STUDENT = re.compile(
 _PROC_MAP = {
     "civil": "ndrcivp", "civ": "ndrcivp",
     "criminal": "ndrcrimp", "crim": "ndrcrimp",
-    "appellate": "ndrapp", "app": "ndrapp",
+    "appellate": "ndrappp", "app": "ndrappp",
     "juvenile": "ndrjuvp", "juv": "ndrjuvp",
 }
 
@@ -272,6 +272,11 @@ def _first_groups(m, *pairs):
 
 class NDMatcher(BaseMatcher):
     def find_all(self, text: str) -> list[Citation]:
+        # Normalize whitespace so citations split across lines (e.g.,
+        # "29-32.1-\n01") are not misparsed as separate components.
+        # First rejoin hyphen-broken lines, then collapse remaining whitespace.
+        text = re.sub(r"-\s+", "-", text)
+        text = " ".join(text.split())
         results = []
         self._match_ndcc(text, results)
         self._match_ndac(text, results)
