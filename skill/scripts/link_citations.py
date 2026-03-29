@@ -16,14 +16,24 @@ from pathlib import Path
 
 
 def _build_cite_map(citations: list[dict]) -> dict[str, str]:
-    """Build a map from cite_text -> url, keeping only entries with URLs."""
+    """Build a map from cite_text -> url, keeping only entries with URLs.
+
+    Dash variants (en dash, em dash) in cite_text are normalized to hyphens
+    so that citations extracted from PDFs (which often use en dashes) match
+    memo text written with plain hyphens.
+    """
     seen: dict[str, str] = {}
     for entry in citations:
-        text = entry.get("cite_text", "").strip()
+        text = _normalize_dashes(entry.get("cite_text", "").strip())
         url = entry.get("url")
         if text and url and text not in seen:
             seen[text] = url
     return seen
+
+
+def _normalize_dashes(text: str) -> str:
+    """Replace en dashes and em dashes with hyphens."""
+    return text.replace("\u2013", "-").replace("\u2014", "-")
 
 
 def _escape_for_regex(text: str) -> str:

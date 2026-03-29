@@ -19,7 +19,7 @@ _NDCC_SECTION = re.compile(
     r'(\d{1,2})(?:\.(\d+))?'
     r'[^.\w]{1,2}(\d{1,2})(?:\.(\d+))?'
     r'[^.\w](\d{1,2})(?:\.(\d+))?'
-    r'(?:\([^)]+\))?'
+    r'(?:\([^)]+\))*'
     r'(?:[,\s]*(?:of\s+the\s+)?'
     r'(?:North\s+Dakota\s+Century\s+Code|N[\s.]*D[\s.]*C(?:ent)*[.\s]*C(?:ode)*)|\W|$)',
     re.IGNORECASE,

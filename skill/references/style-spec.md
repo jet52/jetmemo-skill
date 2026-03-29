@@ -1,5 +1,16 @@
 # Bench Memo Style Specification
 
+## Citation Authority Hierarchy
+
+When citation conventions conflict, apply the following priority order:
+
+1. **North Dakota Court Rules** (N.D.R.App.P., N.D.R.Civ.P., etc.) — binding procedural requirements that govern practice before the Court; cannot be overridden
+2. **Author/court preferences** — specific preferences defined in CLAUDE.md or communicated by the user; may override style guides but not court rules
+3. **Garner's Redbook** — the ND Supreme Court's official style guide
+4. **Bluebook** — default citation format for matters not addressed above
+
+A North Dakota rule always overrides a conflicting Bluebook or Redbook convention. When in doubt, follow the North Dakota-specific format.
+
 ## Citation Formats
 
 ### ND Supreme Court Cases
@@ -50,11 +61,23 @@ Subsequent references:   (0856 R55:22)
 ```
 
 ### Paragraph References
-Always use the paragraph symbol (¶) — **never** write "para." or "paras." in any context:
+
+Always use the paragraph symbol (¶) — **never** write "para." or "paras." in any context.
+
+**In record citations (N.D.R.App.P. 30)** — no space between ¶/¶¶ and the number:
 ```
-¶ 1, ¶ 15
-¶¶ 6-8
+(R45:12:¶15)
+([R49:13](...), ¶38.)
+¶¶7–14
 ```
+
+**In case law citations (Bluebook)** — space between ¶/¶¶ and the number:
+```
+2024 ND 156, ¶ 12
+¶¶ 6–8
+```
+
+This distinction arises because N.D.R.App.P. 30(b)(1) specifies the record citation format with no space (e.g., `(R156:12:¶3)`), which takes precedence over the Bluebook convention per the citation authority hierarchy above.
 
 ### Record Citation Hyperlinks
 
@@ -101,7 +124,7 @@ All citations — case law, record, statutory — should be as precise as possib
 - **Record citations:** Always include pinpoint page when available: `(R45:12)` not just `(R45)`. Include paragraph when citing a specific finding: `(R45:12:¶15)`.
 - **Case citations:** Always include pinpoint paragraph: `2024 ND 156, ¶ 12` not just `2024 ND 156`.
 - **Short identifying quotes:** When a fact or holding could be ambiguous, include a short quote (≤ 15 words) to anchor the citation: `The district court found "no credible evidence of changed circumstances." (R36:4)`.
-- **Brief page citations:** When attributing an argument to a party, cite the brief page: `Appellant argues the statute is ambiguous. (Appellant's Br. at 14.)` Use the format `(Appellant's Br. at ##)` or `(Appellee's Br. at ##)`.
+- **Brief page citations:** When attributing an argument to a party, cite the brief page: `Appellant argues the statute is ambiguous. (Ap't Br. at 14.)` Use the format `(Ap't Br. at ##)` or `(Ap'e Br. at ##)`.
 
 ## Tone and Voice
 
@@ -128,3 +151,17 @@ Common standards in ND appellate practice — use the one cited in the briefs:
 | Clearly erroneous | Findings of fact, sufficiency of evidence | "Definite and firm conviction a mistake has been made" |
 | Abuse of discretion | Discretionary rulings (evidentiary, discovery, sentencing) | "Acted arbitrarily, unreasonably, or unconscionably" |
 | Plain error | Unpreserved errors | "Obvious error affecting substantial rights" |
+
+## Author Preferences
+
+These override Redbook and Bluebook defaults per the citation authority hierarchy (item 2).
+
+### Brief Citation Abbreviations
+
+| Full Form | Abbreviation |
+|-----------|-------------|
+| Appellant's Brief | Ap't Br. |
+| Appellee's Brief | Ap'e Br. |
+| Reply Brief | Reply Br. |
+
+Use these abbreviated forms in all parenthetical citations: `(Ap't Br. at 14.)`, `(Ap'e Br. at 7.)`. In running text, the full form may be used on first reference if needed for clarity.
