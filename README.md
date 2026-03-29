@@ -129,5 +129,8 @@ In Cowork, `~/refs` doesn't persist across sessions. To use local references, mo
 |-----------|---------|-----------|
 | pypdf | Split PDF packets by bookmark | Recommended |
 | [jetcite](https://github.com/jet52/jetcite) | Citation extraction and resolution | Bundled |
+| [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
+
+**jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed and `recommend_mode` is enabled, jetmemo automatically invokes jetpanel for close interpretive questions. Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
