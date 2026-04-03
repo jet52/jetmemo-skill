@@ -585,7 +585,7 @@ Review the memo against this checklist before presenting:
 - [ ] Each issue analysis identifies the strongest argument for and against the district court
 - [ ] Exhibit table included if ≥ 2 contested exhibits
 - [ ] Writ terminology used correctly if writ proceeding
-- [ ] If `recommend_mode`: preliminary staff recommendation appears in ¶1 (bold) and CONCLUSION (bold), phrased as a preliminary assessment deferential to the Court
+- [ ] If `recommend_mode`: preliminary staff recommendation appears in ¶1 (bold) and CONCLUSION (bold), phrased as a preliminary assessment deferential to the Court, aim is to assist the Court in making a wise, legally sound decision by focusing on the most relevant facts and law.
 - [ ] If `recommend_mode` with close questions: suggested oral argument questions appear in CONCLUSION
 - [ ] If not `recommend_mode`: memo does NOT state a preferred disposition; analysis ends with both sides' positions
 - [ ] No placeholder brackets like [Date], [page], [County]

@@ -66,8 +66,10 @@ def _clean_html_to_markdown(html: str) -> str:
     a fixed set of tags. This avoids dropping content wrapped in <div>, <span>,
     or bare text nodes.
     """
-    from bs4 import BeautifulSoup
+    import warnings
+    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
     soup = BeautifulSoup(html, "html.parser")
 
     # Remove footnote markers and other cruft
@@ -195,17 +197,34 @@ def fetch_courtlistener(
     token = _get_token()
 
     # Try Citation Lookup API (preferred) if we have a token
-    if token and components.get("volume") and components.get("reporter") and components.get("page"):
-        result = _fetch_via_citation_lookup(
-            volume=components["volume"],
-            reporter=components["reporter"],
-            page=components["page"],
-            normalized=normalized,
-            token=token,
-            timeout=timeout,
-        )
-        if result[0]:
-            return result
+    if token:
+        # Standard volume/reporter/page citations
+        if components.get("volume") and components.get("reporter") and components.get("page"):
+            result = _fetch_via_citation_lookup(
+                volume=components["volume"],
+                reporter=components["reporter"],
+                page=components["page"],
+                normalized=normalized,
+                token=token,
+                timeout=timeout,
+            )
+            if result[0]:
+                return result
+        # Neutral citations (e.g. "1997 ND 11") — map year/number to volume/page
+        elif components.get("year") and components.get("number"):
+            jurisdiction = citation.jurisdiction if hasattr(citation, "jurisdiction") else ""
+            reporter = jurisdiction.upper() if jurisdiction else ""
+            if reporter:
+                result = _fetch_via_citation_lookup(
+                    volume=components["year"],
+                    reporter=reporter,
+                    page=components["number"],
+                    normalized=normalized,
+                    token=token,
+                    timeout=timeout,
+                )
+                if result[0]:
+                    return result
 
     # Fallback: search API (no auth needed, returns text inline)
     search_cite = normalized or _cite_from_url(source_url)
@@ -253,16 +272,19 @@ def _fetch_via_citation_lookup(
     if not results:
         return None, {}, None
 
-    # Find first result with status 200 and clusters
+    # Find first result with clusters (status 200=exact, 300=multiple matches)
     hit = None
     for r in results:
-        if r.get("status") == 200 and r.get("clusters"):
+        if r.get("clusters"):
             hit = r
             break
     if not hit:
         return None, {}, None
 
-    cluster = hit["clusters"][0]
+    # Pick the most recently modified cluster — a corrected opinion will
+    # have a later date_modified than the original.
+    clusters = hit["clusters"]
+    cluster = max(clusters, key=lambda c: c.get("date_modified", "")) if len(clusters) > 1 else clusters[0]
     case_name = cluster.get("case_name", "Unknown")
     date_filed = cluster.get("date_filed", "")
     court = cluster.get("court", "")
