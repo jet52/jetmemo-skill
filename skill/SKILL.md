@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 2.9.1
+version: 3.0.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -13,10 +13,11 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | Resource               | Path                                                      |
 | ---------------------- | --------------------------------------------------------- |
 | This skill             | `~/.claude/skills/jetmemo/`                            |
-| ND opinions (markdown) | `~/refs/nd/opin/markdown/`                                    |
-| ND Century Code        | `~/refs/nd/code/`                                             |
-| ND Admin Code          | `~/refs/nd/regs/`                                             |
-| ND Court Rules         | `~/refs/nd/rule/`                                             |
+| Opinions               | `~/refs/opin/{reporter}/`                                     |
+| Statutes               | `~/refs/statute/NDCC/`, `~/refs/statute/USC/`                 |
+| Regulations            | `~/refs/reg/NDAC/`, `~/refs/reg/CFR/`                         |
+| Court Rules            | `~/refs/rule/{set}/`                                          |
+| Constitutions          | `~/refs/cnst/ND/`, `~/refs/cnst/US/`                          |
 | Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
 | Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
 | Citation checker       | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
@@ -30,35 +31,31 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 
 All local reference material lives under `~/refs/`. This directory may or may not exist for a given user; always check before relying on it and fall back to web lookups when absent.
 
-**ND opinions** — `~/refs/nd/opin/markdown/<year>/<year>ND<number>.md` (e.g., `2022/2022ND210.md`). Paragraphs are marked `[¶N]`.
+**Opinions** — `~/refs/opin/{reporter}/{volume or year}/{file}.md`. Examples:
+- 2024 ND 156 → `~/refs/opin/ND/2024/2024ND156.md`. Paragraphs are marked `[¶N]`.
+- 585 N.W.2d 123 → `~/refs/opin/NW2d/585/123.md`
+- 505 U.S. 377 → `~/refs/opin/US/505/377.md`
 
-**ND Century Code (N.D.C.C.)** — `~/refs/nd/code/title-<T>/chapter-<T>-<CC>.md` where `<T>` is the title number and `<CC>` is the chapter number (with leading zero). Examples:
-- N.D.C.C. § 14-07.1-01 → `~/refs/nd/code/title-14/chapter-14-07.1.md`
-- N.D.C.C. § 12.1-02-02 → `~/refs/nd/code/title-12.1/chapter-12.1-02.md`
+**Statutes** — `~/refs/statute/{code}/...`. Examples:
+- N.D.C.C. § 14-07.1-01 → `~/refs/statute/NDCC/title-14/chapter-14-07.1.md`
+- N.D.C.C. § 12.1-02-02 → `~/refs/statute/NDCC/title-12.1/chapter-12.1-02.md`
+- 42 U.S.C. § 1983 → `~/refs/statute/USC/42/1983.md`
 
-Each chapter file contains all sections in that chapter as `### § T-CC-SS` headings. To verify a specific section, read the chapter file and search for the section number.
+Each NDCC chapter file contains all sections as `### § T-CC-SS` headings. To verify a specific section, read the chapter file and search for the section number.
 
-**ND Administrative Code (N.D.A.C.)** — `~/refs/nd/regs/title-<T>/article-<T>-<AA>/chapter-<T>-<AA>-<CC>.md` where `<T>` is the title, `<AA>` is the article, and `<CC>` is the chapter. Some small articles are a single file: `~/refs/nd/regs/title-<T>/article-<T>-<AA>.md`. Examples:
-- N.D.A.C. § 75-02-01.2-01 → `~/refs/nd/regs/title-75/article-75-02/chapter-75-02-01.2.md`
-- N.D.A.C. § 75-07-01 → `~/refs/nd/regs/title-75/article-75-07.md` (single-file article)
+**Regulations** — `~/refs/reg/{code}/...`. Examples:
+- N.D.A.C. § 75-02-01.2-01 → `~/refs/reg/NDAC/title-75/article-75-02/chapter-75-02-01.2.md`
+- 40 C.F.R. § 52.21 → `~/refs/reg/CFR/40/52.21.md`
 
-Each chapter file contains all sections as `### § T-AA-CC-SS` headings.
+**Constitutions** — `~/refs/cnst/{jurisdiction}/...`. Examples:
+- N.D. Const. art. I, § 20 → `~/refs/cnst/ND/art-01/sec-20.md`
+- U.S. Const. amend. XIV → `~/refs/cnst/US/amend-14.md`
 
-**ND Court Rules** — `~/refs/nd/rule/<category>/rule-<number>.md`. Categories map from citation abbreviations:
+**Court Rules** — `~/refs/rule/{set}/rule-{number}.md`. Examples:
+- N.D.R.Civ.P. 12(b) → `~/refs/rule/ndrcivp/rule-12.md`
+- Fed. R. Civ. P. 56 → `~/refs/rule/FRCP/rule-56.md`
 
-| Citation prefix | Directory |
-| --------------- | --------- |
-| N.D.R.App.P. | `ndrappp/` |
-| N.D.R.Civ.P. | `ndrcivp/` |
-| N.D.R.Crim.P. | `ndrcrimp/` |
-| N.D.R.Ev. | `ndrev/` |
-| N.D.R.Ct. | `ndrct/` |
-| N.D.R.Juv.P. | `ndrjuvp/` |
-| N.D.Sup.Ct.Admin.R. | `ndsupctadminr/` |
-| N.D.R.Prof.Conduct | `ndrprofconduct/` |
-| N.D.Code.Jud.Conduct | `ndcodejudconduct/` |
-
-Example: N.D.R.Civ.P. 12(b) → `~/refs/nd/rule/ndrcivp/rule-12.md`. N.D.R.App.P. 35.1 → `~/refs/nd/rule/ndrappp/rule-35.1.md`. The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — read the whole file and search for the subsection.
+The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — read the whole file and search for the subsection.
 
 **Read access to `~/refs/` is pre-authorized.** All agents (including subagents) may read files from this directory without additional permission. Do not modify or delete existing files. Adding new files is permitted only by jetcite's caching functions and scraper scripts.
 
@@ -142,9 +139,9 @@ Example: N.D.R.Civ.P. 12(b) → `~/refs/nd/rule/ndrcivp/rule-12.md`. N.D.R.App.P
    cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json > citations.json
    ```
 
-   The output is a JSON array. Each entry has `cite_type`, `local_path`, `local_exists`, `url`, and `search_hint`. Use `cite_type` to determine which agents to launch:
-   - Any `cite_type` in `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, `state_neutral` → launch Agent D
-   - Any `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, `nd_const` → launch Agent E
+   The output is a JSON array. Each entry has `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`. Use `cite_type` to determine which agents to launch:
+   - Any `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter` → launch Agent D
+   - Any `cite_type` in `statute`, `statute_chapter`, `regulation`, `court_rule`, `constitution` → launch Agent E
 
 ---
 
@@ -341,11 +338,11 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 ### Agent D: Precedent Lookup (Conditional)
 
-**Launch only if** `citations.json` contains entries with `cite_type` in `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, or `state_neutral`.
+**Launch only if** `citations.json` contains entries with `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, or `regional_reporter`.
 
 **Reads:** local opinion markdown files (preferred), web sources via jetcite-provided URLs (fallback)
 
-**Input:** Pass Agent D the filtered list of case citation entries from `citations.json` — all entries where `cite_type` is `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, or `state_neutral`. Each entry includes `cite_type`, `local_path`, `local_exists`, `url`, and `search_hint`.
+**Input:** Pass Agent D the filtered list of case citation entries from `citations.json` — all entries where `cite_type` is `neutral_cite`, `us_supreme_court`, `federal_reporter`, or `regional_reporter`. Each entry includes `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
@@ -355,7 +352,8 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **Citation data format:** Each citation entry includes:
 > - `cite_text` / `normalized`: the citation string
-> - `cite_type`: one of `nd_case`, `us_supreme_court`, `federal_reporter`, `state_case`, `state_neutral`
+> - `cite_type`: one of `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter`
+> - `jurisdiction`: jurisdiction code (e.g., `nd`, `us`, `oh`, `wy`)
 > - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
 > - `url`: source URL (ndcourts.gov, CourtListener, Justia, etc.)
 > - `search_hint`: text to match within the file
@@ -364,34 +362,32 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **Lookup strategy by citation type:**
 >
-> **ND cases (`nd_case`):**
+> **Neutral citations (`neutral_cite`):** Any state's medium-neutral citation (e.g., 2024 ND 156, 2022-Ohio-4635).
 >
 > 1. **Local files (fastest, most complete):** If `local_exists` is `true`, use the Read tool on `local_path`. Paragraphs are marked `[¶N]`.
-> 2. **ndcourts.gov (primary web fallback):** If `local_exists` is `false`, use WebFetch on the `url` from the citation data. If the direct URL fails, fall back to the search endpoint:
+> 2. **Official court website (primary web fallback):** If `local_exists` is `false`, use WebFetch on the `url` from the citation data. For ND cases, if the direct URL fails, fall back to the search endpoint:
 >    ```
 >    https://www.ndcourts.gov/supreme-court/opinions?cit1=YYYY&citType=ND&cit2=NNN&pageSize=10&sortOrder=1
 >    ```
->    The search page returns case name, citation, and **highlight text** — a syllabus-like summary of key holdings. Mark the source as "ndcourts.gov (highlight)".
 > 3. **CourtListener search API (secondary web fallback):** Use WebFetch:
 >    ```
->    https://www.courtlistener.com/api/rest/v4/search/?q=%22YYYY+ND+NNN%22&type=o
+>    https://www.courtlistener.com/api/rest/v4/search/?q=%22{search_hint}%22&type=o
 >    ```
->    Returns JSON (no auth required) with `caseName`, `neutralCite`, `syllabus`. Match on `neutralCite` exactly. Mark the source as "CourtListener (syllabus)".
+>    Returns JSON (no auth required) with `caseName`, `neutralCite`, `syllabus`.
 >
 > **U.S. Supreme Court (`us_supreme_court`):**
 >
 > 1. **Local files:** If `local_exists` is `true`, read from `local_path`.
-> 2. **Justia / CourtListener:** Use WebFetch on the `url` field. The URL typically points to Justia (`supreme.justia.com`) or CourtListener. Mark the source as "Justia" or "CourtListener".
+> 2. **Justia / CourtListener:** Use WebFetch on the `url` field.
 >
-> **Federal reporters (`federal_reporter`) and state cases (`state_case`, `state_neutral`):**
+> **Federal reporters (`federal_reporter`) and regional reporters (`regional_reporter`):**
 >
 > 1. **Local files:** If `local_exists` is `true`, read from `local_path`.
-> 2. **CourtListener:** Use WebFetch on the `url` field. CourtListener redirect URLs (`courtlistener.com/c/...`) resolve to the opinion page. Mark the source as "CourtListener".
+> 2. **CourtListener:** Use WebFetch on the `url` field.
 > 3. **CourtListener search API (if redirect URL fails):** Use WebFetch:
 >    ```
 >    https://www.courtlistener.com/api/rest/v4/search/?q=%22{search_hint}%22&type=o
 >    ```
->    Returns JSON with `caseName`, `citation`, `syllabus`. Mark the source as "CourtListener (syllabus)".
 >
 > ---
 >
@@ -424,23 +420,24 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 ### Agent E: Statutory, Administrative Code & Court Rule Verification (Conditional)
 
-**Launch only if** `citations.json` contains entries with `cite_type` in `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, or `nd_const`.
+**Launch only if** `citations.json` contains entries with `cite_type` in `statute`, `statute_chapter`, `regulation`, `court_rule`, or `constitution`.
 
-**Reads:** local markdown files from `~/refs/nd/code/`, `~/refs/nd/regs/`, and `~/refs/nd/rule/`
+**Reads:** local markdown files from `~/refs/statute/`, `~/refs/reg/`, `~/refs/rule/`, and `~/refs/cnst/`
 
-**Input:** Pass Agent E the filtered list of statutory/regulatory/rule entries from `citations.json`. Each entry includes `local_path`, `local_exists`, `url`, and `search_hint`.
+**Input:** Pass Agent E the filtered list of statutory/regulatory/rule/constitution entries from `citations.json`. Each entry includes `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
-> **Statutory, Administrative Code & Court Rule Verification**
+> **Statutory, Regulatory, Constitutional & Court Rule Verification**
 >
-> You have a list of N.D.C.C., N.D.A.C., N.D. Constitution, and/or court rule citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
+> You have a list of statute, regulation, constitution, and/or court rule citations extracted from appellate briefs, with pre-resolved local paths and URLs from the citation checker. For each citation, look up the text and verify that it exists and supports the proposition it is cited for. Also verify the accuracy of any direct quotes from these sources.
 >
 > **Citation data format:** Each citation entry includes:
 > - `cite_text` / `normalized`: the citation string
-> - `cite_type`: `ndcc`, `ndcc_chapter`, `ndac`, `nd_court_rule`, or `nd_const`
+> - `cite_type`: `statute`, `statute_chapter`, `regulation`, `court_rule`, or `constitution`
+> - `jurisdiction`: jurisdiction code (e.g., `nd`, `us`)
 > - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
-> - `url`: official source URL (ndlegis.gov, ndcourts.gov, etc.)
+> - `url`: official source URL (ndlegis.gov, ndcourts.gov, govinfo.gov, etc.)
 > - `search_hint`: text to search for within the local file (e.g., `14-07.1-02`)
 >
 > **Lookup order:**

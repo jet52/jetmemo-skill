@@ -11,10 +11,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 INSTALL_DIR = Path.home() / ".claude" / "skills" / SKILL_NAME
 
 REF_DIRS = {
-    "nd/opin": "ND Supreme Court opinions (markdown)",
-    "nd/code": "North Dakota Century Code",
-    "nd/regs": "North Dakota Administrative Code",
-    "nd/rule": "North Dakota Court Rules",
+    "opin": "Court opinions (by reporter)",
+    "statute/NDCC": "North Dakota Century Code",
+    "reg/NDAC": "North Dakota Administrative Code",
+    "rule": "Court rules",
+    "cnst": "Constitutions",
 }
 
 
