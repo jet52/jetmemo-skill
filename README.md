@@ -115,27 +115,34 @@ jetmemo-skill/
 
 The skill uses local reference datasets for citation verification and precedent lookup. Without these, the memo will still generate but citation verification and precedent analysis will be limited.
 
-Download the reference archives from [ndconst.org/tools](https://ndconst.org/tools) and install to `~/refs/`:
+Download the reference archives from the [jetcite v2.0.0 release](https://github.com/jet52/jetcite/releases/tag/v2.0.0) and install to `~/refs/`:
 
 ```bash
 mkdir -p ~/refs
-# Required for precedent verification (Agent D)
-unzip opin.zip -d ~/refs/opin
 
-# Required for statutory verification (Agent E)
-unzip ndcc.zip -d ~/refs/statute/NDCC
-unzip ndac.zip -d ~/refs/reg/NDAC
+# Opinions — precedent verification (Agent D)
+unzip nd-opin-markdown.zip -d ~/refs/opin/ND
+unzip nd-opin-NW2d.zip -d ~/refs/opin/NW2d
+unzip nd-opin-NW.zip -d ~/refs/opin/NW
 
-# Required for court rule verification (Agent E)
-unzip rule.zip -d ~/refs/rule
+# Statutes and regulations — statutory verification (Agent E)
+unzip nd-code.zip -d ~/refs/statute/NDCC
+unzip nd-regs.zip -d ~/refs/reg/NDAC
+
+# Court rules and constitution (Agent E)
+unzip nd-rule.zip -d ~/refs/rule
+unzip nd-cnst.zip -d ~/refs/cnst/ND
 ```
 
 | Archive | Contents | Install to | Purpose |
 |---------|----------|------------|---------|
-| [opin.zip](https://ndconst.org/_media/tools/opin.zip) | ND Supreme Court opinions (1997-present) | `~/refs/opin/` | Precedent lookup and citation verification |
-| [ndcc.zip](https://ndconst.org/_media/tools/ndcc.zip) | North Dakota Century Code | `~/refs/statute/NDCC/` | Statutory text verification |
-| [ndac.zip](https://ndconst.org/_media/tools/ndac.zip) | North Dakota Administrative Code | `~/refs/reg/NDAC/` | Administrative rule verification |
-| [rule.zip](https://ndconst.org/_media/tools/rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
+| [nd-opin-markdown.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-markdown.zip) | ND opinions by neutral cite (2024 ND 156) | `~/refs/opin/ND/` | Precedent lookup — paragraph-level |
+| [nd-opin-NW2d.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-NW2d.zip) | ND opinions by N.W.2d cite | `~/refs/opin/NW2d/` | Precedent lookup — regional reporter |
+| [nd-opin-NW.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-NW.zip) | ND opinions by N.W. cite | `~/refs/opin/NW/` | Precedent lookup — early reporter |
+| [nd-code.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-code.zip) | North Dakota Century Code | `~/refs/statute/NDCC/` | Statutory text verification |
+| [nd-regs.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-regs.zip) | North Dakota Administrative Code | `~/refs/reg/NDAC/` | Administrative rule verification |
+| [nd-rule.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
+| [nd-cnst.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-cnst.zip) | North Dakota Constitution | `~/refs/cnst/ND/` | Constitutional text verification |
 
 If `~/refs/` subdirectories are missing, the skill falls back to web lookups (ndcourts.gov, then CourtListener). Web fallbacks provide syllabus/highlight summaries but not full opinion text, so pinpoint paragraph verification is only available with local files.
 
