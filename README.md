@@ -12,6 +12,18 @@ Generate bench memos from appellate case PDFs. Analyzes briefs, notices of appea
 - `pypdf` — PDF processing library (`pip install pypdf`)
 - Reference data (see [Reference Data](#reference-data) below)
 
+### Optional PDF extractors
+
+`extract_text.py` tries multiple extractors in priority order and picks the best result. Only `pypdf` is required; the others improve extraction quality for difficult PDFs:
+
+| Extractor | Install | Notes |
+|-----------|---------|-------|
+| pdftotext | `brew install poppler` | Fast, often best for native-text PDFs |
+| pypdf | `pip install pypdf` | **Required.** Pure Python fallback |
+| PyMuPDF | `pip install pymupdf` | Good quality, fast |
+| pdfplumber | `pip install pdfplumber` | Useful for table-heavy documents |
+| marker | `pip install marker-pdf` | ML-based OCR for scanned/image PDFs (slow) |
+
 ## Installation
 
 ### Claude Code (CLI)
@@ -71,6 +83,7 @@ Provide case documents (briefs, notices of appeal, orders) as PDFs in the workin
 jetmemo-skill/
 ├── README.md
 ├── VERSION
+├── LICENSE
 ├── Makefile
 ├── install.py
 ├── install.sh
@@ -78,13 +91,20 @@ jetmemo-skill/
 └── skill/
     ├── SKILL.md
     ├── lib/
-    │   └── jetcite/          ← bundled citation library
+    │   └── jetcite/          ← bundled citation library (v2.0.0)
+    │       ├── models.py     ← citation data models
+    │       ├── scanner.py    ← regex-based citation extraction
+    │       ├── resolver.py   ← URL resolution engine
+    │       ├── cache.py      ← disk cache for resolved URLs
+    │       ├── patterns/     ← citation patterns by jurisdiction
+    │       └── sources/      ← URL source modules (ndcourts, courtlistener, etc.)
     ├── references/
     │   ├── memo-format.md
     │   └── style-spec.md
     └── scripts/
         ├── check_update.py
-        ├── extract_text.py
+        ├── ensure_refs.py    ← auto-detects Cowork mounted refs
+        ├── extract_text.py   ← multi-library PDF text extraction
         ├── link_citations.py
         ├── memo_to_docx.py
         ├── splitmarks.py
@@ -127,8 +147,8 @@ In Cowork, `~/refs` doesn't persist across sessions. To use local references, mo
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
-| pypdf | Split PDF packets by bookmark | Recommended |
-| [jetcite](https://github.com/jet52/jetcite) | Citation extraction and resolution | Bundled |
+| pypdf | PDF text extraction and packet splitting | Required |
+| [jetcite](https://github.com/jet52/jetcite) v2.0.0 | Citation extraction and URL resolution | Bundled |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.

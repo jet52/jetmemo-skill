@@ -24,7 +24,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # --- Quality thresholds ---
 GOOD_WPL = 5.0  # words/line: stop immediately
@@ -32,6 +32,50 @@ MARGINAL_WPL = 3.0  # words/line: keep looking but stash as candidate
 GARBLED_RATIO_MAX = 0.05  # max fraction of garbled characters
 # Per-page: minimum chars to consider a page "text-bearing" vs "sparse"
 PAGE_MIN_CHARS = 50
+
+
+# --- PDF introspection helpers ---
+
+
+def _pdf_page_count(pdf_path: Path) -> int:
+    """Return page count using pypdf. Returns 0 on failure."""
+    try:
+        import pypdf
+
+        return len(pypdf.PdfReader(str(pdf_path)).pages)
+    except Exception:
+        return 0
+
+
+def _is_image_pdf(pdf_path: Path) -> bool:
+    """Check whether a PDF is image-based (no font resources on any page).
+
+    Samples up to 5 pages. If none have /Font in their /Resources,
+    the PDF is almost certainly scanned images with no extractable text.
+    """
+    try:
+        import pypdf
+
+        reader = pypdf.PdfReader(str(pdf_path))
+        sample = reader.pages[: min(5, len(reader.pages))]
+        for page in sample:
+            resources = page.get("/Resources")
+            if resources and "/Font" in resources:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _marker_timeout(page_count: int) -> int:
+    """Scaled timeout in seconds for marker based on page count."""
+    if page_count <= 0:
+        return 300
+    if page_count < 10:
+        return 120
+    if page_count <= 30:
+        return 300
+    return 600
 
 
 # --- Per-page quality ---
@@ -286,6 +330,7 @@ def _extract_marker(pdf_path: Path) -> list[str] | None:
     marker_bin = shutil.which("marker_single")
     if not marker_bin:
         return None
+    timeout = _marker_timeout(_pdf_page_count(pdf_path))
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
@@ -300,7 +345,7 @@ def _extract_marker(pdf_path: Path) -> list[str] | None:
                 ],
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=timeout,
             )
             if result.returncode != 0:
                 return None
@@ -310,7 +355,9 @@ def _extract_marker(pdf_path: Path) -> list[str] | None:
                 text = md_files[0].read_text(encoding="utf-8")
                 # marker doesn't provide per-page splits, return as one block
                 return [text] if text else None
-    except (subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired:
+        print(f"    marker timed out after {timeout}s")
+    except OSError:
         pass
     return None
 
@@ -357,8 +404,36 @@ def list_extractors() -> list[tuple[str, bool]]:
     return availability
 
 
-def extract_pdf(pdf_path: Path, verbose: bool = True) -> ExtractionResult | None:
-    """Try extractors in priority order. Return best result or None."""
+def extract_pdf(
+    pdf_path: Path, verbose: bool = True
+) -> tuple[ExtractionResult | None, bool]:
+    """Try extractors in priority order.
+
+    Returns (best_result_or_None, is_image_pdf).
+    """
+    image_pdf = _is_image_pdf(pdf_path)
+
+    if image_pdf:
+        page_count = _pdf_page_count(pdf_path)
+        timeout = _marker_timeout(page_count)
+        if verbose:
+            print(
+                f"  Image-based PDF detected ({page_count} pages) "
+                f"— skipping text extractors, starting OCR "
+                f"(timeout {timeout}s)"
+            )
+        # Only try marker for image-based PDFs
+        page_texts = _extract_marker(pdf_path)
+        if page_texts is None:
+            if verbose:
+                print("  marker unavailable or failed — needs visual read")
+            return None, True
+        pages = [_score_page(i + 1, text) for i, text in enumerate(page_texts)]
+        result = ExtractionResult(extractor="marker", pages=pages)
+        if verbose:
+            _print_result_summary(result)
+        return result, True
+
     best: ExtractionResult | None = None
 
     for name, func in EXTRACTORS:
@@ -375,28 +450,32 @@ def extract_pdf(pdf_path: Path, verbose: bool = True) -> ExtractionResult | None
         pages = [_score_page(i + 1, text) for i, text in enumerate(page_texts)]
         result = ExtractionResult(extractor=name, pages=pages)
 
-        n_text = len(result.text_pages)
-        n_good = len(result.good_pages)
-        n_sparse = len(result.sparse_pages)
-        n_poor = len(result.poor_pages)
-
         if verbose:
-            status = "good" if result.is_good else ("marginal" if result.is_marginal else "poor")
-            parts = [f"{result.avg_wpl:.1f} avg words/line"]
-            parts.append(f"{len(pages)} pages ({n_text} text, {n_sparse} sparse)")
-            if n_text:
-                parts.append(f"{n_good}/{n_text} good")
-            if n_poor:
-                parts.append(f"{n_poor} poor")
-            print(f"{', '.join(parts)} — {status}")
+            _print_result_summary(result)
 
         if result.is_good:
-            return result
+            return result, False
 
         if result.is_marginal and (best is None or result.score > best.score):
             best = result
 
-    return best
+    return best, False
+
+
+def _print_result_summary(result: ExtractionResult) -> None:
+    """Print a one-line quality summary for an extraction result."""
+    n_text = len(result.text_pages)
+    n_good = len(result.good_pages)
+    n_sparse = len(result.sparse_pages)
+    n_poor = len(result.poor_pages)
+    status = "good" if result.is_good else ("marginal" if result.is_marginal else "poor")
+    parts = [f"{result.avg_wpl:.1f} avg words/line"]
+    parts.append(f"{len(result.pages)} pages ({n_text} text, {n_sparse} sparse)")
+    if n_text:
+        parts.append(f"{n_good}/{n_text} good")
+    if n_poor:
+        parts.append(f"{n_poor} poor")
+    print(f"{', '.join(parts)} — {status}")
 
 
 def process_pdf(pdf_path: Path, verbose: bool = True) -> bool:
@@ -406,7 +485,7 @@ def process_pdf(pdf_path: Path, verbose: bool = True) -> bool:
     if verbose:
         print(f"\n{pdf_path.name}:")
 
-    result = extract_pdf(pdf_path, verbose=verbose)
+    result, image_pdf = extract_pdf(pdf_path, verbose=verbose)
 
     if result is None:
         if verbose:
@@ -434,6 +513,7 @@ def process_pdf(pdf_path: Path, verbose: bool = True) -> bool:
         "sparse_pages": len(result.sparse_pages),
         "avg_words_per_line": round(result.avg_wpl, 1),
         "quality": "good" if result.is_good else "marginal",
+        "image_pdf": image_pdf,
         "visual_read_pages": result.visual_read_pages,
         "visual_read_ranges": result.visual_read_ranges(),
     }
