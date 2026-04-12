@@ -6,4 +6,6 @@ __pycache__/
 *.zip
 package-lock.json
 test-data/
+PLAN.md
+skill/TODO.md
 .claude/
