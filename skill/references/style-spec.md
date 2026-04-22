@@ -57,7 +57,7 @@ N.D.R.Crim.P. 29        (Criminal Procedure)
 **Multiple district court cases (Rule 30(b)(1)):** When the appeal involves more than one district court case, each record citation must identify which case it belongs to. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
 ```
 First reference:         (00-0000-CV-00000 R55:22)
-Subsequent references:   (9856 R55:22)
+Subsequent references:   (0000 R55:22)
 ```
 
 ### Paragraph References
@@ -102,7 +102,7 @@ When a citation contains multiple record items, hyperlink each separately:
 **Multiple district court cases (Rule 30(b)(1)):** When the appeal consolidates multiple district court cases, each record citation must identify which case it belongs to, and the URL must use that item's district court case number. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
 ```
 First:  [00-0000-CV-00000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)
-Later:  [0856 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)
+Later:  [0000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)
 ```
 
 ### Authority Citation Hyperlinks

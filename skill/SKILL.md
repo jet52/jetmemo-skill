@@ -550,7 +550,7 @@ When multiple record items appear together, hyperlink each separately:
 
 **Multiple district court cases (Rule 30(b)(1)):** When the appeal consolidates multiple district court cases, each record citation must identify which case the record item belongs to, using the mapping from Agent A's metadata. The URL must use that item's district court case number. On first reference, use the full district court case number; on subsequent references, use only the last four digits:
 - First: `[00-0000-CV-00000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)`
-- Later: `[0856 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)`
+- Later: `[0000 R55:22](https://record.ndcourts.gov/Case/00-0000-CV-00000/55#page=22)`
 
 **Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural). In record citations, no space between ¶/¶¶ and the number (per N.D.R.App.P. 30): `¶3`, `¶¶7–14`. In case law citations, include a space (per Bluebook): `¶ 12`, `¶¶ 6–8`.
 
