@@ -161,3 +161,14 @@ In Cowork, `~/refs` doesn't persist across sessions. To use local references, mo
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
 
 **jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed and `recommend_mode` is enabled, jetmemo automatically invokes jetpanel for close interpretive questions. Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
+
+## Contributing
+
+On a fresh clone, activate the local pre-push sensitive-content check:
+
+```bash
+git config --local core.hooksPath .githooks
+```
+
+It scans commits being pushed for likely ND court dockets, confidential-case
+captions, and committed binaries. Bypass once with `git push --no-verify`.
