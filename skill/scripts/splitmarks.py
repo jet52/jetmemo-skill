@@ -16,7 +16,7 @@ except ImportError:
     print("Error: pypdf is required. Install with: pip install pypdf", file=sys.stderr)
     sys.exit(1)
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 
 @dataclass
@@ -398,10 +398,19 @@ def split_pdf(
                         print("  Bookmarks:")
                         print_bookmark_tree(bookmark_by_title[title])
 
-            # Create new PDF with the page range
+            # Create new PDF with the page range.
+            # Use .append() rather than .add_page(): pypdf rebuilds /Resources
+            # from only what the included pages reference. add_page() inherits
+            # the source page's full /Resources, so every split would carry the
+            # entire source PDF's resource pool (3x+ output bloat on large
+            # packets). import_outline=False because bookmarks are added
+            # manually below via add_bookmarks_to_writer.
             writer = pypdf.PdfWriter()
-            for page_num in range(start_page, end_page + 1):
-                writer.add_page(reader.pages[page_num])
+            writer.append(
+                reader,
+                pages=(start_page, end_page + 1),
+                import_outline=False,
+            )
 
             # Add bookmarks to output
             if child_bookmark:
