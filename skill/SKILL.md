@@ -139,7 +139,7 @@ The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — 
    cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json > citations.json
    ```
 
-   The output is a JSON array. Each entry has `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`. Use `cite_type` to determine which agents to launch:
+   The output is a JSON array. Each entry has `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`. Case entries also carry `antecedent_name` (the case name preceding the cite — a heuristic, may be `null`) and, for parallel citations, `parallel_cite`, `redundant_parallel`, and `primary_cite` (entries marked `redundant_parallel: true` are a parallel form of `primary_cite` — the same case). Use `cite_type` to determine which agents to launch:
    - Any `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter` → launch Agent D
    - Any `cite_type` in `statute`, `statute_chapter`, `regulation`, `court_rule`, `constitution` → launch Agent E
 
@@ -357,6 +357,8 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
 > - `url`: source URL (ndcourts.gov, CourtListener, Justia, etc.)
 > - `search_hint`: text to match within the file
+> - `antecedent_name`: best-effort case name preceding the cite (e.g. "State v. Smith"). Heuristic — may be `null`; use it to identify the case and to sanity-check the lookup.
+> - `redundant_parallel` / `primary_cite`: if `redundant_parallel` is `true`, this entry is a parallel citation form of `primary_cite` (the same case). Verify the `primary_cite` entry once; do not separately verify the redundant one.
 >
 > ---
 >
@@ -394,7 +396,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > **Limitations of web fallbacks:** Web sources typically provide summary text (syllabus, headnotes), not full opinions. Pinpoint paragraph verification is not possible from web summaries.
 >
 > **Citations to verify:**
-> [Insert citation entries from citations.json, plus the proposition each is cited for in the briefs]
+> [Insert citation entries from citations.json, plus the proposition each is cited for in the briefs. When `antecedent_name` is present, present each as "*antecedent_name*, <cite>" (e.g. "*State v. Smith*, 2024 ND 156") so the named case travels with its citation. Collapse parallel forms: list only the `primary_cite` of each pair and note its parallel cite alongside; omit entries marked `redundant_parallel: true` as separate items.]
 >
 > **Prioritization:** Focus on opinions cited for standards of review and contested holdings first. If the list exceeds 15 citations, skip string cites (citations grouped in a series without individual discussion). Prioritize ND cases (most relevant to this court's precedent), then U.S. Supreme Court cases, then federal and state cases.
 >
@@ -405,6 +407,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > 3. **Extract the holding and key rule** from the cited paragraph(s) or syllabus.
 > 4. **Assess support:** Does the cited paragraph (or syllabus) actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, **Does not support**, or **Insufficient data** (when the web fallback syllabus is too sparse to assess).
 > 5. **Standard of review:** If the opinion articulates a standard of review, note it.
+> 6. **Name check:** If `antecedent_name` is present and the opinion you located has a clearly different case name, flag it as a possible mis-cite (wrong volume/page or wrong reporter). `antecedent_name` is heuristic — flag only clear conflicts, not formatting or abbreviation differences, and never flag when it is `null`.
 >
 > **Return two sections:**
 >
@@ -413,7 +416,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > | Citation | Type | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
 > | -------- | ---- | --------- | ------ | --------- | ---------------- | ------------------ |
 >
-> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found".
+> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
 >
 > **B. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.

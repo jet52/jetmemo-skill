@@ -57,8 +57,54 @@ def scan_citations(text: str, refs_dir: str = "~/refs") -> list[dict]:
 
     entries = [to_legacy_dict(c, refs) for c in citations]
     add_parallel_info(entries, citations)
+    mark_redundant_parallels(entries)
 
     return entries
+
+
+def _primary_of_pair(a: dict, b: dict) -> tuple[dict, dict]:
+    """Given two parallel citation entries for the same case, pick the primary.
+
+    Preference order: a locally-cached copy, then a neutral citation, then the
+    first entry. Returns (primary, secondary).
+    """
+    if a.get("local_exists") != b.get("local_exists"):
+        return (a, b) if a.get("local_exists") else (b, a)
+    a_neutral = a.get("cite_type") == "neutral_cite"
+    b_neutral = b.get("cite_type") == "neutral_cite"
+    if a_neutral != b_neutral:
+        return (a, b) if a_neutral else (b, a)
+    return a, b
+
+
+def mark_redundant_parallels(entries: list[dict]) -> None:
+    """Flag parallel-citation siblings that refer to the same case.
+
+    When two entries are parallel cites of each other AND share a non-null
+    ``antecedent_name`` (the preceding case name), they point to one opinion.
+    The secondary is marked ``redundant_parallel: True`` with ``primary_cite``
+    naming the entry that should actually be verified, so the orchestrator can
+    collapse the pair into a single item for Agent D.
+
+    Entries are flagged, never removed: link_citations.py still needs every
+    cite_text to hyperlink both citation forms in the memo.
+    """
+    by_norm = {e["normalized"]: e for e in entries}
+    for entry in entries:
+        if entry.get("redundant_parallel"):
+            continue
+        parallel = entry.get("parallel_cite")
+        if not parallel:
+            continue
+        sibling = by_norm.get(parallel)
+        if sibling is None or sibling.get("redundant_parallel"):
+            continue
+        ante = entry.get("antecedent_name")
+        if not ante or sibling.get("antecedent_name") != ante:
+            continue
+        primary, secondary = _primary_of_pair(entry, sibling)
+        secondary["redundant_parallel"] = True
+        secondary["primary_cite"] = primary["normalized"]
 
 
 # ---------------------------------------------------------------------------
@@ -93,10 +139,14 @@ def main():
         local = sum(1 for r in results if r.get("local_exists"))
         web = sum(1 for r in results if r.get("url") and not r.get("local_exists"))
         unresolved = sum(1 for r in results if not r.get("local_exists") and not r.get("url"))
+        redundant = sum(1 for r in results if r.get("redundant_parallel"))
 
         print(f"\nCitation Scan Results")
         print(f"{'=' * 40}")
-        print(f"Total: {len(results)} | Local: {local} | Web only: {web} | Unresolved: {unresolved}")
+        summary = f"Total: {len(results)} | Local: {local} | Web only: {web} | Unresolved: {unresolved}"
+        if redundant:
+            summary += f" | Parallel dups: {redundant}"
+        print(summary)
 
         by_type: dict[str, list[dict]] = {}
         for r in results:
@@ -106,7 +156,11 @@ def main():
             print(f"\n{ctype.upper()} ({len(cites)}):")
             for r in cites:
                 status = "local" if r.get("local_exists") else ("url" if r.get("url") else "???")
-                print(f"  [{status:5s}] {r['normalized']}")
+                ante = r.get("antecedent_name")
+                label = f"{ante}, {r['normalized']}" if ante else r["normalized"]
+                if r.get("redundant_parallel"):
+                    label += f"  (parallel of {r['primary_cite']})"
+                print(f"  [{status:5s}] {label}")
 
 
 if __name__ == "__main__":
