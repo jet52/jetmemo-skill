@@ -24,7 +24,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # --- Quality thresholds ---
 GOOD_WPL = 5.0  # words/line: stop immediately
@@ -67,15 +67,21 @@ def _is_image_pdf(pdf_path: Path) -> bool:
         return False
 
 
+# marker timeout budget. On Apple Silicon, surya's table model is not
+# MPS-compatible and falls back to CPU (~25-30s/page measured). We budget a
+# fixed model-load overhead plus a generous per-page rate, capped so a
+# pathologically large image PDF falls back to visual read instead of blocking
+# for the better part of an hour.
+MARKER_BASE_OVERHEAD = 60   # seconds: model load + setup
+MARKER_PER_PAGE = 40        # seconds/page (measured ~25-30; +margin)
+MARKER_TIMEOUT_CAP = 1800   # 30 min ceiling (~43 pages); beyond this, prefer visual read
+
+
 def _marker_timeout(page_count: int) -> int:
-    """Scaled timeout in seconds for marker based on page count."""
+    """Per-page timeout (seconds) for marker, scaled to measured CPU OCR speed."""
     if page_count <= 0:
-        return 300
-    if page_count < 10:
-        return 120
-    if page_count <= 30:
-        return 300
-    return 600
+        return 300  # unknown page count: conservative default
+    return min(MARKER_BASE_OVERHEAD + MARKER_PER_PAGE * page_count, MARKER_TIMEOUT_CAP)
 
 
 # --- Per-page quality ---
@@ -325,8 +331,14 @@ def _extract_pdfplumber(pdf_path: Path) -> list[str] | None:
         return None
 
 
-def _extract_marker(pdf_path: Path) -> list[str] | None:
-    """marker_single CLI (slow, ML-based). Returns whole doc as single page."""
+def _extract_marker(pdf_path: Path, verbose: bool = True) -> list[str] | None:
+    """marker_single CLI (slow, ML-based). Returns whole doc as single page.
+
+    When verbose, marker's progress (tqdm bars + logs, which it writes to
+    stderr) streams to the console so a multi-minute OCR run isn't a silent
+    black box. stdout is suppressed; the extracted text is read from the
+    output file, not stdout.
+    """
     marker_bin = shutil.which("marker_single")
     if not marker_bin:
         return None
@@ -343,8 +355,8 @@ def _extract_marker(pdf_path: Path) -> list[str] | None:
                     "--output_dir",
                     tmpdir,
                 ],
-                capture_output=True,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=None if verbose else subprocess.DEVNULL,
                 timeout=timeout,
             )
             if result.returncode != 0:
@@ -423,7 +435,7 @@ def extract_pdf(
                 f"(timeout {timeout}s)"
             )
         # Only try marker for image-based PDFs
-        page_texts = _extract_marker(pdf_path)
+        page_texts = _extract_marker(pdf_path, verbose=verbose)
         if page_texts is None:
             if verbose:
                 print("  marker unavailable or failed — needs visual read")
@@ -438,9 +450,11 @@ def extract_pdf(
 
     for name, func in EXTRACTORS:
         if verbose:
-            print(f"  Trying {name}...", end=" ", flush=True)
+            # marker streams progress to stderr; start it on its own line.
+            end = "\n" if name == "marker" else " "
+            print(f"  Trying {name}...", end=end, flush=True)
 
-        page_texts = func(pdf_path)
+        page_texts = func(pdf_path, verbose=verbose) if name == "marker" else func(pdf_path)
 
         if page_texts is None:
             if verbose:
