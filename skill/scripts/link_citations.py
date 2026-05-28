@@ -37,16 +37,78 @@ def _normalize_dashes(text: str) -> str:
 
 
 def _escape_for_regex(text: str) -> str:
-    """Escape regex special characters in citation text."""
-    return re.escape(text)
+    """Escape regex special characters in citation text.
+
+    Appends a negative lookahead for word characters when the citation
+    ends in an alphanumeric, so that "Rule 5" does not match inside
+    "Rule 52" and "N.D.R.Juv.P. 5" does not match inside "N.D.R.Juv.P. 52".
+    """
+    pattern = re.escape(text)
+    if text and text[-1].isalnum():
+        pattern += r"(?![A-Za-z0-9])"
+    return pattern
+
+
+# ---------------------------------------------------------------------------
+# Short-form alias detection
+# ---------------------------------------------------------------------------
+# A bench memo will typically cite an authority in full once (e.g.,
+# "N.D.R.Juv.P. 9" or "N.D.C.C. \u00a7 27-19.1-01(3)") and then refer to it
+# repeatedly in short form ("Rule 9(a)(3)", "\u00a7 27-19.1-01(5)", "Section
+# 27-19.1-01"). jetcite typically returns only the full form, so the
+# short-form references are not in `citations.json`.
+#
+# To preserve the relationship, we derive short-form aliases from the
+# full-form citations: every linked "N.D.R.{set}.P. {N}" registers
+# "Rule {N}" as an alias; every linked "N.D.C.C. \u00a7 {section}" registers
+# "\u00a7 {section}" and "Section {section}". If two different rule sets share
+# the same rule number with different URLs, the short-form is ambiguous
+# and is skipped (the writer must spell out the rule set).
+
+_RULE_FULLFORM_RE = re.compile(
+    r"^N\.D\.R\.(?:[A-Za-z]+\.?)+P?\.?\s+(\d+(?:\.\d+)?)\b"
+)
+_STATUTE_FULLFORM_RE = re.compile(
+    r"^N\.D\.C\.C\.\s+\u00a7\s+([\d.\-]+?)(?:\([^)]+\))*$"
+)
+
+
+def _add_shortform_aliases(cite_map: dict[str, str]) -> dict[str, str]:
+    """Register Rule N / \u00a7 N.N / Section N.N aliases for unambiguous full-form cites.
+
+    Returns the enriched cite_map. Aliases are added only when the short
+    form would not be ambiguous across the citations seen.
+    """
+    rule_aliases: dict[str, set[str]] = {}
+    section_aliases: dict[str, set[str]] = {}
+
+    for text, url in cite_map.items():
+        rm = _RULE_FULLFORM_RE.match(text)
+        if rm:
+            rule_aliases.setdefault(f"Rule {rm.group(1)}", set()).add(url)
+            continue
+        sm = _STATUTE_FULLFORM_RE.match(text)
+        if sm:
+            section = sm.group(1).rstrip(".,")
+            section_aliases.setdefault(f"\u00a7 {section}", set()).add(url)
+            section_aliases.setdefault(f"Section {section}", set()).add(url)
+
+    enriched = dict(cite_map)
+    for alias, urls in {**rule_aliases, **section_aliases}.items():
+        if len(urls) == 1 and alias not in enriched:
+            enriched[alias] = next(iter(urls))
+    return enriched
 
 
 def link_citations(markdown: str, citations: list[dict]) -> str:
     """Replace bare citation text in markdown with [cite_text](url) links.
 
-    Skips text that is already inside a markdown link.
+    Skips text that is already inside a markdown link. Short-form aliases
+    ("Rule N", "§ N.N.N", "Section N.N.N") are derived from full-form
+    citations so that subsequent short references in the memo are linked
+    to the same URL.
     """
-    cite_map = _build_cite_map(citations)
+    cite_map = _add_shortform_aliases(_build_cite_map(citations))
     if not cite_map:
         return markdown
 

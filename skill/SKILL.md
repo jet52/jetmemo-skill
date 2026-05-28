@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.1.0
+version: 3.2.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -604,13 +604,39 @@ Write the memo to a file in the current working directory:
 
 ### Step 7: Link Authority Citations
 
-Hyperlink citations to authority in the memo markdown using URLs from `citations.json` (generated in Step 1). This converts bare citation text (e.g., `2024 ND 156`) into markdown links (e.g., `[2024 ND 156](url)`), so they become clickable in the docx output.
+Hyperlink citations to authority in the memo markdown. This converts bare citation text (e.g., `2024 ND 156`) into markdown links (e.g., `[2024 ND 156](url)`), so they become clickable in the docx output.
+
+**Build a memo-derived citation list first**, then merge with the brief-derived `citations.json` from Step 1, and run `link_citations.py` against the merged file. The memo-derived list catches forms that appear in the memo but not verbatim in the briefs (e.g., `N.D.R.Civ.P. 52` cleanly parsed, vs. a multi-line jetcite artifact from the brief).
 
 ```bash
-python3 ~/.claude/skills/jetmemo/scripts/link_citations.py {memo_file} citations.json
+# Generate memo-derived citation list
+python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} --refs-dir ~/refs --json > memo_citations.json
+
+# Merge brief + memo citations (de-dup by cite_text, prefer entries with URLs)
+python3 -c "
+import json
+brief = json.load(open('citations.json'))
+memo = json.load(open('memo_citations.json'))
+merged = {}
+for e in brief + memo:
+    t = e.get('cite_text','').strip()
+    u = e.get('url')
+    if t and u and t not in merged:
+        merged[t] = e
+json.dump(list(merged.values()), open('merged_citations.json','w'), indent=2)
+"
+
+# Link with the enriched set
+python3 ~/.claude/skills/jetmemo/scripts/link_citations.py {memo_file} merged_citations.json
 ```
 
-This modifies the markdown file in place. Citations already inside markdown links (e.g., record citations) are left untouched. If `citations.json` does not exist (e.g., citation extraction was skipped), skip this step.
+`link_citations.py` (version ≥ 2) automatically derives short-form aliases:
+- Any linked `N.D.R.{Set}.P. {N}` registers `Rule {N}` as an alias (skipped if ambiguous across rule sets).
+- Any linked `N.D.C.C. § {S}` registers `§ {S}` and `Section {S}` as aliases.
+
+Subsection references (e.g., `Rule 9(a)(3)`, `§ 27-19.1-01(5)`) are linked at the parent rule/section — the subsection is left as plain text following the link.
+
+Citations already inside markdown links are left untouched. If `citations.json` does not exist (e.g., citation extraction was skipped), skip this step.
 
 ### Step 8: Generate Word Document
 

@@ -638,15 +638,16 @@ def convert(md_path, docx_path):
 
         if line_type == "h1":
             # Top-level heading (shouldn't appear in body normally)
-            p = doc.add_paragraph(content, style="Heading 1")
+            p = doc.add_paragraph(style="Heading 1")
+            add_formatted_runs(p, content)
             i += 1
             continue
 
         if line_type == "h2":
             in_quick_ref = content.strip().lower() == "quick reference"
             if content.strip().lower().startswith("key exhibits"):
-                # Key Exhibits heading - use Heading 2
-                p = doc.add_paragraph(strip_heading_number(content), style="Heading 2")
+                p = doc.add_paragraph(style="Heading 2")
+                add_formatted_runs(p, strip_heading_number(content))
                 i += 1
                 continue
             if in_quick_ref:
@@ -654,14 +655,17 @@ def convert(md_path, docx_path):
                 i += 1
                 continue
             if is_section_heading(content):
-                p = doc.add_paragraph(content, style="Heading 1")
+                p = doc.add_paragraph(style="Heading 1")
+                add_formatted_runs(p, content)
             else:
-                p = doc.add_paragraph(strip_heading_number(content), style="Heading 2")
+                p = doc.add_paragraph(style="Heading 2")
+                add_formatted_runs(p, strip_heading_number(content))
             i += 1
             continue
 
         if line_type == "h3":
-            p = doc.add_paragraph(strip_heading_number(content), style="Heading 3")
+            p = doc.add_paragraph(style="Heading 3")
+            add_formatted_runs(p, strip_heading_number(content))
             in_quick_ref = False
             i += 1
             continue
