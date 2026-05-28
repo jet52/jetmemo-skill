@@ -9,7 +9,7 @@ JETCITE_DEST := skill/lib/jetcite
 package: clean
 	mkdir -p $(SKILL_NAME)-skill
 	cp -r skill/ install.py install.sh README.md VERSION $(SKILL_NAME)-skill/
-	cd $(SKILL_NAME)-skill && rm -rf skill/.venv skill/node_modules skill/package-lock.json skill/__pycache__ skill/TODO.md
+	cd $(SKILL_NAME)-skill && rm -rf .venv node_modules package-lock.json __pycache__ TODO.md
 	find $(SKILL_NAME)-skill -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	zip -r $(ZIP_NAME) $(SKILL_NAME)-skill/
 	rm -rf $(SKILL_NAME)-skill
