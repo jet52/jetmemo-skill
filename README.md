@@ -91,7 +91,7 @@ jetmemo-skill/
 └── skill/
     ├── SKILL.md
     ├── lib/
-    │   └── jetcite/          ← bundled citation library (v2.0.0)
+    │   └── jetcite/          ← bundled citation library (v2.1.1)
     │       ├── models.py     ← citation data models
     │       ├── scanner.py    ← regex-based citation extraction
     │       ├── resolver.py   ← URL resolution engine
@@ -150,12 +150,14 @@ If `~/refs/` subdirectories are missing, the skill falls back to web lookups (nd
 
 In Cowork, `~/refs` doesn't persist across sessions. To use local references, mount your `refs` directory via the Cowork folder picker. At startup the skill auto-detects a mounted folder named `refs` and symlinks `~/refs` to it — no manual setup needed.
 
+**Network access for citation URLs.** Web fallbacks and ND opinion PDF resolution require outbound access to official-source domains (ndcourts.gov, courtlistener.com, etc.), which Cowork blocks by default. Add the domains listed in [`skill/lib/jetcite/NETWORK.md`](skill/lib/jetcite/NETWORK.md) to the Cowork egress allowlist (sandbox settings → **Allow network egress** → **Additional allowed domains**), then start a new session. Without this, ND citations resolve to a search URL rather than the direct opinion PDF.
+
 ## Other Dependencies
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | PDF text extraction and packet splitting | Required |
-| [jetcite](https://github.com/jet52/jetcite) v2.0.0 | Citation extraction and URL resolution | Bundled |
+| [jetcite](https://github.com/jet52/jetcite) v2.1.1 | Citation extraction and URL resolution | Bundled |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
