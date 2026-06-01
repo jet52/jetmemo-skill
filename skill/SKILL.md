@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.2.3
+version: 3.2.4
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -26,7 +26,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 > **Dependencies:**
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
 > - verify_citations.py uses a bundled copy of `jetcite` (in `lib/jetcite/`); to update, run `make vendor-jetcite` from the project root
-> - `httpx` (ideally `httpx[socks]`) is optional: jetcite uses it to resolve/fetch source URLs, but imports and local `~/refs` citation scanning work without it. When httpx (or its `socksio` extra under a SOCKS proxy) is missing, network lookups degrade gracefully to search URLs — prefer MCP servers for retrieval in that case (see Agent D).
+> - `httpx` (ideally `httpx[socks]`) is optional: jetcite uses it to resolve/fetch source URLs, but imports and local `~/refs` citation scanning work without it. When httpx (or its `socksio` extra under a SOCKS proxy) is missing, network lookups degrade gracefully to search URLs — prefer MCP servers for retrieval in that case (see the **Legal-Research MCP Servers** section).
 
 ### ~/refs directory layout
 
@@ -146,6 +146,35 @@ The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — 
 
 ---
 
+## Legal-Research MCP Servers (ndcourts-mcp, CourtListener)
+
+Two optional MCP servers improve case-law lookup and verification when connected. **They are augmentation, not replacement** — every check degrades gracefully to the existing pipeline (`~/refs/` local files → `WebFetch` on the citation's `url` → CourtListener search API). Never fail or stall a memo because an MCP server is absent or returns no data.
+
+**Availability:** Before relying on a server, check whether its tools are present in your tool set — an ndcourts-mcp tool such as `mcp__ndcourts__verify_citation`, or a CourtListener tool such as `mcp__claude_ai_CourtListener__search`. If a tool is not present, skip silently to the next tier.
+
+**Source precedence — apply at every case-citation lookup or verification; fall through on a miss:**
+
+1. **ndcourts-mcp** (primary, North Dakota cases) — a local ND opinion corpus. Deterministic, no network or proxy, so it works in sandboxes (e.g. Cowork) where outbound HTTP is restricted.
+2. **CourtListener MCP** (secondary) — case data ndcourts-mcp lacks: U.S. Supreme Court, federal, and other-state authorities, and ND opinions missing from the ND corpus.
+3. **Existing pipeline** (fallback) — `~/refs/` local files, then `WebFetch` on the `url` from `citations.json`, then the CourtListener search API. The only path when no MCP server is connected.
+
+A local `~/refs/` opinion file, when present, is equally authoritative and instant; use it or the MCP — whichever is available — before any web fetch. **Never go to the web for an ND case citation without first trying ndcourts-mcp or a local file.**
+
+**Out of scope for both servers:** the authoritative text of statutes, court rules, the constitution, and the administrative code — these always resolve through the existing pipeline (Agent E / `~/refs/` / web). ndcourts-mcp covers ND *opinions* only.
+
+**ndcourts-mcp tools (call by full `mcp__ndcourts__` name):**
+
+- `lookup_opinion(citation, include_text=False, text_limit=5000)` → metadata and all known parallel citations for a cite; set `include_text=True` for the first `text_limit` characters.
+- `get_opinion_text(citation, offset=0, limit=10000)` → opinion text in chunks; paginate by advancing `offset` (max `limit` 50000).
+- `get_pinpoint(citation, paragraph=N)` **or** `get_pinpoint(citation, quote="…")` → a paragraph's text from its number, or the ¶ a quote lives in (with verbatim status). Paragraph pinpoints need ¶ markers (generally 1997+ opinions).
+- `verify_citation(query, expected_case_name="…")` → `found`, canonical case name, filing date, authoring justice, the full Redbook parallel-cite set, and a ready-to-paste `formatted` cite; catches wrong volume/page/year. With `expected_case_name`, flags name drift.
+- `verify_quotation(citation, quote)` → whether the quote is verbatim (whitespace/curly-quote/dash-tolerant), a word-level diff of any discrepancy, the closest actual text, and the pinpoint ¶.
+- `case_summary(citation)` → one-call front matter (caption, parallel cites, date, author, panel, voting record, disposition, ¶ count). **`disposition` and `syllabus_points` are derived/heuristic — verify against the opinion.**
+
+**Cardinal caution:** ndcourts-mcp is a research aid, not an authoritative reporter; derived fields (disposition, syllabus) and the `antecedent_name` heuristic are best-effort. Use MCP results to locate and check authority, but cite to the opinion text itself.
+
+---
+
 ## Phase 2: Parallel Analysis (Subagents)
 
 Launch all applicable agents **simultaneously** using the Task tool (`subagent_type: general-purpose`). Each agent gets:
@@ -153,6 +182,8 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 - Paths to relevant `.txt` files (or PDF paths if `needs_visual_read`)
 - Focused extraction instructions
 - Expected output format (structured markdown)
+
+**For Agent D** (and any agent doing citation lookups), also **copy the "Legal-Research MCP Servers" section above into the agent's prompt** — the subagent does not read this SKILL, so it needs the source precedence and tool signatures inline to prefer the MCP over the web.
 
 ### Agent A: Appellant Brief Analysis
 
@@ -363,11 +394,9 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > ---
 >
-> **MCP servers come first — before any web fetch.** Check for connected MCP tools and prefer them over WebFetch. They query maintained databases directly (no proxy, no scraping), so they are faster and more reliable, and they work in sandboxes where outbound HTTP is restricted:
-> - **ND Supreme Court opinions → the `ndcourts` MCP** (tools prefixed `mcp__ndcourts__`). For any ND citation (e.g., `2024 ND 156`), use `lookup_opinion` / `get_opinion_text` / `get_pinpoint` to retrieve text and `verify_citation` / `verify_quotation` to confirm a cite or quotation. This is the authoritative ND source — use it before any ndcourts.gov or CourtListener **web** fetch. (A local `~/refs` file, when present, is equally good and instant; use whichever is available. Never go to the web for an ND cite without first trying the MCP or a local file.)
-> - **Other case law → the CourtListener MCP** (tools prefixed `mcp__claude_ai_CourtListener__`), when connected. Use `search` / `get_endpoint_item` for U.S. Supreme Court, federal, and other-state cites before a raw WebFetch.
+> **Sources and precedence — MCP before web.** Follow the **Legal-Research MCP Servers** precedence (included in your instructions above): prefer ndcourts-mcp for ND cites and the CourtListener MCP for other case law, falling through to local files and then the web only on a miss. For each ND case citation, verify and retrieve via ndcourts-mcp first — `verify_citation(query, expected_case_name="…")` for existence, caption, and the Redbook parallel-cite set; `verify_quotation(citation, quote)` for any quoted passage; `get_pinpoint(citation, paragraph=N)` for a pinpoint ¶; and `lookup_opinion` / `get_opinion_text` to read the opinion. For U.S. Supreme Court, federal, and other-state cites, try the CourtListener MCP. A local `~/refs/` opinion file is equally authoritative and instant — use the MCP or a local file before any web fetch. **Never go to the web for an ND case citation without first trying ndcourts-mcp or a local file.**
 >
-> The `local_path` and `url` fields in the citation data come from the citation checker (jetcite), which only **generates** paths and URLs — it never fetches over the network and has no knowledge of MCP. Those fields support the offline/local and web-fallback paths below; they do **not** mean the web should be tried before an MCP. Only fall through to the web steps if no MCP is connected and no local file exists.
+> The `local_path` and `url` fields in the citation data come from the citation checker (jetcite), which only **generates** paths and URLs — it never fetches over the network and has no knowledge of MCP. Those fields support the local and web-fallback tiers below; they do **not** mean the web should be tried before an MCP. Only fall through to the web steps if no MCP is connected and no local file exists.
 >
 > **Lookup strategy by citation type (web fallbacks, used only when no MCP/local source applies):**
 >
