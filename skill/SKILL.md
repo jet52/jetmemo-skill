@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.2.0
+version: 3.2.1
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -108,7 +108,7 @@ The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — 
 
 5. **Build a manifest:** `{path, type, page_count}` for every document. Track this manifest for all subsequent steps.
 
-6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). This flag controls whether the memo includes a preliminary staff recommendation for each issue. All recommendations must be phrased as preliminary assessments that defer to the Court's authority to decide. If there are close questions, the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
+6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). **Do not ask the user which mode they want.** When the request contains no recommendation trigger, proceed directly to a neutral memo without prompting. This flag controls whether the memo includes a preliminary staff recommendation for each issue. All recommendations must be phrased as preliminary assessments that defer to the Court's authority to decide. If there are close questions, the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
 ### Step 1: Read References and Extract Text
 
