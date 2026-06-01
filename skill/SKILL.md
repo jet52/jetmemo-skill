@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.2.1
+version: 3.2.2
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -26,6 +26,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 > **Dependencies:**
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
 > - verify_citations.py uses a bundled copy of `jetcite` (in `lib/jetcite/`); to update, run `make vendor-jetcite` from the project root
+> - `httpx` (ideally `httpx[socks]`) is optional: jetcite uses it to resolve/fetch source URLs, but imports and local `~/refs` citation scanning work without it. When httpx (or its `socksio` extra under a SOCKS proxy) is missing, network lookups degrade gracefully to search URLs — prefer MCP servers for retrieval in that case (see Agent D).
 
 ### ~/refs directory layout
 
@@ -362,12 +363,18 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > ---
 >
-> **Lookup strategy by citation type:**
+> **MCP servers come first — before any web fetch.** Check for connected MCP tools and prefer them over WebFetch. They query maintained databases directly (no proxy, no scraping), so they are faster and more reliable, and they work in sandboxes where outbound HTTP is restricted:
+> - **ND Supreme Court opinions → the `ndcourts` MCP** (tools prefixed `mcp__ndcourts__`). For any ND citation (e.g., `2024 ND 156`), use `lookup_opinion` / `get_opinion_text` / `get_pinpoint` to retrieve text and `verify_citation` / `verify_quotation` to confirm a cite or quotation. This is the authoritative ND source — use it before any ndcourts.gov or CourtListener **web** fetch. (A local `~/refs` file, when present, is equally good and instant; use whichever is available. Never go to the web for an ND cite without first trying the MCP or a local file.)
+> - **Other case law → the CourtListener MCP** (tools prefixed `mcp__claude_ai_CourtListener__`), when connected. Use `search` / `get_endpoint_item` for U.S. Supreme Court, federal, and other-state cites before a raw WebFetch.
+>
+> The `local_path` and `url` fields in the citation data come from the citation checker (jetcite), which only **generates** paths and URLs — it never fetches over the network and has no knowledge of MCP. Those fields support the offline/local and web-fallback paths below; they do **not** mean the web should be tried before an MCP. Only fall through to the web steps if no MCP is connected and no local file exists.
+>
+> **Lookup strategy by citation type (web fallbacks, used only when no MCP/local source applies):**
 >
 > **Neutral citations (`neutral_cite`):** Any state's medium-neutral citation (e.g., 2024 ND 156, 2022-Ohio-4635).
 >
 > 1. **Local files (fastest, most complete):** If `local_exists` is `true`, use the Read tool on `local_path`. Paragraphs are marked `[¶N]`.
-> 2. **Official court website (primary web fallback):** If `local_exists` is `false`, use WebFetch on the `url` from the citation data. For ND cases, if the direct URL fails, fall back to the search endpoint:
+> 2. **Official court website (primary web fallback):** If `local_exists` is `false` and no MCP returned the opinion, use WebFetch on the `url` from the citation data. For ND cases, if the direct URL fails, fall back to the search endpoint:
 >    ```
 >    https://www.ndcourts.gov/supreme-court/opinions?cit1=YYYY&citType=ND&cit2=NNN&pageSize=10&sortOrder=1
 >    ```
@@ -402,7 +409,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **For each citation:**
 >
-> 1. **Locate the opinion.** Use `local_path` if `local_exists`, then `url`, then CourtListener search. If none produces a result, mark as "Not found" and move on.
+> 1. **Locate the opinion.** Prefer a connected MCP — the `ndcourts` MCP for ND cites, the CourtListener MCP for others — before the web. Otherwise use `local_path` if `local_exists`, then `url`, then CourtListener search. If none produces a result, mark as "Not found" and move on.
 > 2. **Read the cited paragraph** (local: the pinpoint ¶, plus 1-2 surrounding paragraphs for context; web: use the syllabus and snippet). If no pinpoint and using local files, skim the full opinion.
 > 3. **Extract the holding and key rule** from the cited paragraph(s) or syllabus.
 > 4. **Assess support:** Does the cited paragraph (or syllabus) actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, **Does not support**, or **Insufficient data** (when the web fallback syllabus is too sparse to assess).
@@ -416,7 +423,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > | Citation | Type | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
 > | -------- | ---- | --------- | ------ | --------- | ---------------- | ------------------ |
 >
-> Source column values: "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
+> Source column values: "ndcourts MCP", "CourtListener MCP", "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
 >
 > **B. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.

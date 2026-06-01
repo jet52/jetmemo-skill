@@ -24,15 +24,25 @@ TIMEOUT = 3.0
 
 
 def _read_local_version() -> str | None:
-    """Read the locally installed version."""
-    # Installed location
-    version_file = Path.home() / ".claude" / "skills" / SKILL_NAME / "VERSION"
-    if version_file.exists():
-        return version_file.read_text().strip()
-    # Repo location (scripts/ -> skill/ -> repo root)
-    repo_version = Path(__file__).resolve().parent.parent.parent / "VERSION"
-    if repo_version.exists():
-        return repo_version.read_text().strip()
+    """Read the locally installed version.
+
+    Resolves VERSION relative to this script so it works regardless of where
+    the skill is mounted (the home-based path below fails under Claude Cowork,
+    where the skill lives at /sessions/.../mnt/.claude/skills/... rather than
+    under ``Path.home()``). Candidates, in order:
+      - <skill>/VERSION         (installed/mounted: scripts/ -> skill/)
+      - <repo root>/VERSION      (dev checkout: scripts/ -> skill/ -> repo/)
+      - ~/.claude/skills/<name>/VERSION  (legacy home-based fallback)
+    """
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parent.parent / "VERSION",
+        here.parent.parent.parent / "VERSION",
+        Path.home() / ".claude" / "skills" / SKILL_NAME / "VERSION",
+    ]
+    for version_file in candidates:
+        if version_file.exists():
+            return version_file.read_text().strip()
     return None
 
 
