@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.2.2
+version: 3.2.3
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -416,16 +416,22 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > 5. **Standard of review:** If the opinion articulates a standard of review, note it.
 > 6. **Name check:** If `antecedent_name` is present and the opinion you located has a clearly different case name, flag it as a possible mis-cite (wrong volume/page or wrong reporter). `antecedent_name` is heuristic — flag only clear conflicts, not formatting or abbreviation differences, and never flag when it is `null`.
 >
-> **Return two sections:**
+> **Return three sections:**
 >
-> **A. Citation Verification Table:**
+> **A. Lookup Methods Summary:** One line tallying how the citations were located, so the reader can confirm the MCP was tried before the web. Count each citation once, by the source that actually produced the result (the `Source` column value):
+>
+> `Lookup methods — ndcourts MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N`
+>
+> Then add a one-line **ND web-fallback note**: if every ND citation was resolved via the ndcourts MCP or a local file, write "All ND cites via MCP/local." If any ND citation fell through to the web, list those cites and the reason (e.g., "ndcourts MCP not connected" or "MCP returned no match"). This makes any web fallback for ND opinions explicit rather than silent.
+>
+> **B. Citation Verification Table:**
 >
 > | Citation | Type | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
 > | -------- | ---- | --------- | ------ | --------- | ---------------- | ------------------ |
 >
-> Source column values: "ndcourts MCP", "CourtListener MCP", "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
+> Source column values: "ndcourts MCP", "CourtListener MCP", "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". Record the source that actually produced the result, so the Source column and the section-A tally agree. If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
 >
-> **B. Legal Framework Narrative:**
+> **C. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.
 
 ### Agent E: Statutory, Administrative Code & Court Rule Verification (Conditional)
@@ -599,6 +605,7 @@ Review the memo against this checklist before presenting:
 - [ ] Only citations that appear in the parties' briefs are used
 - [ ] Citation formats are correct (see style-spec.md)
 - [ ] Record citations include pinpoint pages where available
+- [ ] If Agent D ran: its Lookup Methods Summary is reported to the user (and carried into the Step 9 appendix when verification runs), with any ND web fallback explained
 
 Fix any issues found before presenting the memo to the user.
 
@@ -608,6 +615,8 @@ Write the memo to a file in the current working directory:
 
 - Default filename: `{case_number}_memo.md` (e.g., `20990001_memo.md`)
 - If the user specifies a different output path, use that
+
+When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndcourts MCP or pulled from the web — even when the optional Step 9 verification is skipped. If Agent D did not run (no case citations), omit it.
 
 ### Step 7: Link Authority Citations
 
@@ -669,18 +678,21 @@ The human-readable output shows total citations found, how many resolve locally 
 
 For JSON output (to inspect individual citations), add `--json`.
 
-After verification, append a summary to the memo:
+After verification, append a summary to the memo. Carry the **Lookup Methods Summary** from Agent D (section A) into this appendix verbatim, so the finished memo shows whether ND opinions were checked against the ndcourts MCP rather than pulled from the web:
 
 ```
 ## CITATION VERIFICATION
 
 Verified: X | Unverified: Y | Skipped: Z
 
+Lookup methods (case law) — ndcourts MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N
+ND web-fallback: [Agent D's note — "All ND cites via MCP/local," or the list of ND cites resolved on the web and why]
+
 ### Unverified Citations
 - [list any citations that could not be confirmed]
 ```
 
-Record citations (R##) reference the appellate record and are not checked by the script.
+The script's own local/web-only/unresolved counts describe URL *resolution* and are separate from the Lookup Methods tally, which reflects where Agent D actually retrieved each opinion (MCP, local, or web). Record citations (R##) reference the appellate record and are not checked by the script.
 
 ---
 
