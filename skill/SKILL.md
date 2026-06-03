@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.6.0
+version: 3.7.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -633,6 +633,47 @@ The subagent returns a condensed panel section. Insert it into the memo after th
 
 **Token budget note:** Each panel invocation adds ~85-170K tokens via the subagent. This runs in a separate context and does not consume the main memo's context window, but the condensed output (~200-500 tokens per question) is inserted into the main context for memo generation.
 
+### Step 3.6: Supplemental Authority (Agent F — synthesis subagent)
+
+The citation rule permits — and often expects — the memo to cite controlling authority the parties missed (see Important Rules). This step is how that authority enters the draft: a grounded, bounded lookup in the ND corpus, run **before** drafting so the first draft is already complete. It is a synthesis-phase subagent (distinct from the Phase 2 extraction agents), launched after Step 3 framing because it needs the issues, the provisions that are points of decision, and the cases each side leans on.
+
+**The bounded triple — the ONLY three things Agent F looks for:**
+
+1. **Controlling ND precedent the parties missed** on the dispositive question of an issue.
+2. **Negative treatment** (overruled, superseded, abrogated, limited, called into doubt) of a case **a party leans on**.
+3. **On-point ND construction of the statute or rule at issue** that the parties did not cite.
+
+This is **not** a roving search for analogous cases, persuasive authority, or a literature review. If a candidate does not fall in the triple, it does not belong.
+
+**Four bounding rules (all apply):**
+
+- **Triggered, not blanket.** Run Agent F **only if** the ndcourts MCP is connected **and** Step 3 identified at least one of: a statute/rule that is a point of decision (→ triple #3), or a load-bearing case a party relies on (→ triple #1, #2). If neither, skip this step.
+- **Cap + clerk standard.** At most ~2–3 supplemental authorities per issue. The test is "would a careful clerk flag this to the justice?" — controlling, material, on the dispositive question. Reject merely analogous, cumulative, or tangential hits.
+- **MCP-grounded or it doesn't happen.** Every candidate must be **retrieved from the ndcourts MCP and actually read** (`search → read → cite`), never recalled from memory and then "verified." This step is **MCP-only**: no `~/refs` and no web fallback — `~/refs` is indexed by citation, not by topic, so it cannot do discovery, and open web search reintroduces the fabrication risk. If the ndcourts MCP is absent, skip the step entirely and note the limitation.
+- **Neutral presentation.** Supplemental authority is reported for what it holds. If it cuts against a party (including the party who would otherwise win), say so even-handedly; added authority is not advocacy.
+
+**How to invoke:** Launch one subagent (Task tool, `subagent_type: general-purpose`). **Copy the ndcourts-mcp tool signatures from the "Legal-Research MCP Servers" section into the prompt** (the subagent does not read this SKILL and needs the tool list) — but make clear this lookup is **MCP-only**: do not import the section's local-file/web fallback precedence here. Supply, per issue: the dispositive legal question, the provision(s) that are points of decision, the load-bearing cases each side relies on, and the brief-derived citation list (so the subagent can exclude what the parties already cited).
+
+**Prompt template:**
+
+> **Supplemental Authority Lookup (bounded)**
+>
+> For each issue below, find ND authority the parties did **not** cite, limited strictly to these three categories. Use the ndcourts MCP **only** — search the corpus and read the opinion; never propose a cite from memory, and do not fall back to local files or web search. If the ndcourts MCP is unavailable, return "MCP unavailable — no supplemental lookup performed" and stop.
+>
+> 1. **Controlling ND precedent the parties missed** on the dispositive question. Anchor the search to authority already in the case: `get_citing_opinions(<lead case the party cites>)` and/or `more_like_this(<lead case>)`, filtered to ND opinions that state or refine the controlling rule. Do not free-search topics.
+> 2. **Negative treatment of a relied-on case:** for each load-bearing case a party cites, `check_treatment(<cite>)` and `get_subsequent_history(<cite>)`. Report only adverse treatment (overruled/superseded/abrogated/limited/doubted).
+> 3. **On-point ND construction of the statute/rule at issue:** `find_opinions_construing(<provision>)`; report ND opinions construing the same provision on the point in dispute.
+>
+> **Exclude** anything already in this brief-derived citation list: [insert citations.json cites]. **Cap** at ~2–3 authorities per issue; include only what a careful clerk would flag to the justice — controlling and material, not merely analogous.
+>
+> **For each authority returned, give:** the issue it bears on; the citation; which triple category (1/2/3); the proposition it supports or the treatment it carries; a **pinpoint** (¶) you read (`get_pinpoint` / `verify_quotation`) confirming it; one line on **why it is material**; and confirmation it is **not** in the parties' briefs. If a category yields nothing material for an issue, say "none."
+>
+> Return a structured list grouped by issue. Do not draft memo prose.
+
+**Use of the results in Step 4:** Incorporate each returned authority into the relevant issue's analysis, **tagged as the memo's addition** (in text or a parenthetical, e.g., "(not cited by the parties)"). These citations then flow through Step 7 (linking) and **trigger the mandatory Step 9 verification** (added authority must be verified with extra care). If Agent F returns nothing, the draft proceeds on the parties' authority alone — that is a normal outcome, not a failure.
+
+**Degradation:** No ndcourts MCP → skip this step and note in the memo that supplemental-authority lookup was not run (corpus unavailable). Do not substitute open web search for the bounded corpus lookup.
+
 ### Step 4: Generate the Memo
 
 **Record citation hyperlinking:** All record citations in the markdown output must be hyperlinks to `record.ndcourts.gov`. Use the district court case number from metadata to construct URLs:
@@ -666,6 +707,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
    - Appellee's arguments with citations
    - Sub-arguments (A, B, C) as needed
    - Analysis and assessment — tracking the court's actual grounds; where a threshold ground is dispositive, you may note that alternative grounds need not be reached rather than developing each at equal length
+   - Any **supplemental authority from Step 3.6 (Agent F)** bearing on the issue, woven into the analysis and **tagged as the memo's addition** ("(not cited by the parties)")
 6. **CONCLUSION** — If `recommend_mode`, restate the preliminary staff recommendation in **bold**, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
 
 ### Step 5: Self-Review
@@ -680,6 +722,7 @@ Review the memo against this checklist before presenting:
 - [ ] Paragraph numbering [¶1], [¶2], etc. is sequential throughout
 - [ ] Every fact in BACKGROUND has a record citation
 - [ ] Each issue section has a standard of review with case authority
+- [ ] **Any supplemental authority added beyond the briefs (Step 3.6) is tagged as the memo's addition, presented neutrally, and verified via the mandatory Step 9** — or none was added
 - [ ] Both sides' arguments are fairly presented with citations
 - [ ] Disputed facts are noted inline in BACKGROUND with both versions and cites
 - [ ] Preservation is addressed for each issue (or noted as not at issue)
@@ -690,7 +733,7 @@ Review the memo against this checklist before presenting:
 - [ ] If `recommend_mode` with close questions: suggested oral argument questions appear in CONCLUSION
 - [ ] If not `recommend_mode`: memo does NOT state a preferred disposition; analysis ends with both sides' positions
 - [ ] No placeholder brackets like [Date], [page], [County]
-- [ ] Only citations that appear in the parties' briefs are used
+- [ ] Every citation is verified (exists and supports the proposition); any authority not cited by the parties is verified with extra care and flagged as the memo's addition
 - [ ] Citation formats are correct (see style-spec.md)
 - [ ] Record citations include pinpoint pages where available
 - [ ] If Agent D ran: its Lookup Methods Summary is reported to the user (and carried into the Step 9 appendix when verification runs), with any ND web fallback explained
@@ -704,7 +747,7 @@ Write the memo to a file in the current working directory:
 - Default filename: `{case_number}_memo.md` (e.g., `20990001_memo.md`)
 - If the user specifies a different output path, use that
 
-When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndcourts MCP or pulled from the web — even when the optional Step 9 verification is skipped. If Agent D did not run (no case citations), omit it.
+When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndcourts MCP or pulled from the web — even when Step 9 verification is not run (the brief-only case, where it remains optional). If Agent D did not run (no case citations), omit it.
 
 ### Step 6.5: jetredline Audit (Default On)
 
@@ -818,9 +861,13 @@ This produces `{case_number}_memo.docx` alongside the markdown file. The docx us
 
 If python-docx is not installed, the script will print an error. Install with `pip install python-docx`.
 
-### Step 9: Citation Verification (Optional)
+### Step 9: Citation Verification (Mandatory if the memo adds non-brief authority; otherwise optional)
 
-If the user requests verification (or if you want to flag potential issues), run the citation checker on the finished memo:
+**When this step is required:** If the memo cites **any** authority that does **not** appear in the parties' briefs (a case, statute, rule, or constitutional provision the memo added — see the verification rule in Important Rules), this step is **mandatory**, not optional. The relaxed citation rule permits adding missed authority only on the condition that it is verified "with extra care," and this is where that verification happens. If the memo cites only authority drawn from the briefs, run this step when the user requests verification or when you want to flag potential issues.
+
+To decide which case you are in, diff the memo's citations against the brief-derived `citations.json` from Step 1: any cite in the memo but not in the briefs is **added authority** and triggers mandatory verification (and must be tagged as the memo's addition per the Important Rules).
+
+Run the citation checker on the finished memo:
 
 ```bash
 python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} --refs-dir ~/refs
@@ -829,6 +876,8 @@ python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} 
 The human-readable output shows total citations found, how many resolve locally vs. web-only vs. unresolved, grouped by type.
 
 For JSON output (to inspect individual citations), add `--json`.
+
+**Verify added authority with extra care.** For each added (non-brief) citation, confirm via the ndcourts MCP, a local `~/refs` source, or another authoritative source that the authority exists **and** supports the proposition it is cited for — `verify_citation` / `verify_quotation` / `get_pinpoint` for ND cases (see the Legal-Research MCP Servers section). A bare resolve by `verify_citations.py` (which only checks that a URL/path can be formed) is **not** sufficient for added authority. If an added citation cannot be confirmed to exist and support its proposition, remove it from the memo — do not ship it flagged-but-unverified.
 
 After verification, append a summary to the memo. Carry the **Lookup Methods Summary** from Agent D (section A) into this appendix verbatim, so the finished memo shows whether ND opinions were checked against the ndcourts MCP rather than pulled from the web:
 
@@ -839,6 +888,9 @@ Verified: X | Unverified: Y | Skipped: Z
 
 Lookup methods (case law) — ndcourts MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N
 ND web-fallback: [Agent D's note — "All ND cites via MCP/local," or the list of ND cites resolved on the web and why]
+
+### Added Authority (not cited by the parties)
+- [list each citation the memo added beyond the briefs, with its verification status and source — or "None: all authority drawn from the parties' briefs"]
 
 ### Unverified Citations
 - [list any citations that could not be confirmed]
@@ -875,7 +927,7 @@ These strategies make it affordable to read the **whole essential set** thorough
 
 - **Read the essential documents — never guess them.** Every order, judgment, and key/highly-relevant document is read in full before analysis, regardless of length, scan quality, or token cost (see the Essential-Documents Rule and Step 2.5). Never infer an order's grounds or reasoning from the briefs; never hedge ("appears to," "seems") around a document you could read.
 - **Write tight.** Read everything essential, then recount only what the issues require. ~6–10 pages is typical; prune unnecessary facts; over 15 pages must be justified by multiple or particularly complex issues.
-- **Never fabricate citations.** Only cite cases and authorities that appear in the parties' briefs.
+- **Never fabricate citations; verify every citation.** Cite a case, statute, or rule only after confirming it exists and says what it is cited for — via the ndcourts MCP, a local `~/refs` source, or another authoritative source. This is an anti-fabrication and verification rule, **not** a briefs-only rule. The memo may and often should cite relevant authority the parties did not cite: identifying on-point cases, statutes, or rules the parties missed is part of assisting the Court in applying the correct law consistent with its own precedent, regardless of what the parties briefed. When citing authority neither party cited, verify it with extra care and make clear (in text or a parenthetical) that it was not cited by the parties, so the reader knows it is the memo's addition.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
 - **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be phrased as preliminary staff assessments, clearly stated but deferential to the Court's authority to decide. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.

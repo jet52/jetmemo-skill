@@ -208,7 +208,7 @@ The panel section does not receive a paragraph number — it is a supplementary 
 ### What to Avoid
 
 - **Never** use placeholder brackets: [Date], [page], [County], etc.
-- **Never** fabricate citations — use only cases from the parties' briefs
+- **Never** fabricate citations — verify every citation against an authoritative source. (This is not a briefs-only rule: the memo may cite relevant on-point authority the parties did not cite; verify it with extra care and flag it as the memo's addition.)
 - **Never** use "I" or "we"
 - **Never** omit record citations from BACKGROUND facts
 - **Never** present only one side's arguments without the other
