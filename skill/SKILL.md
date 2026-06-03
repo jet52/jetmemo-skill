@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.5.0
+version: 3.6.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -107,7 +107,11 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
    > **Writ proceedings:** If the case is a writ proceeding, use "petitioner/respondent" terminology throughout instead of "appellant/appellee." Agent A handles the petition (or appellant brief), Agent B handles the response (or appellee brief).
 
-3. **Split large PDFs down to individual record items.** For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
+3. **Split large PDFs down to individual record items.**
+
+   **First, check whether the records already arrived split.** The `record-fetch` tool splits packets into per-document files by default, named `R{idx} - {DocumentName}.pdf` (e.g., `R38 - Order.pdf`). If the working directory already contains a set of such per-document files (filenames beginning with `R` followed by a number), the record is **already split** — skip splitmarks for those and classify them directly. Splitting is only a fallback for records that arrive as an un-split combined PDF (e.g., a clerk-emailed packet or a brief's appendix).
+
+   For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
    python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
