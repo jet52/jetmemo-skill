@@ -159,10 +159,13 @@ In Cowork, `~/refs` doesn't persist across sessions. To use local references, mo
 | pypdf | PDF text extraction and packet splitting | Required |
 | [jetcite](https://github.com/jet52/jetcite) v2.1.2 | Citation extraction and URL resolution | Bundled |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
+| [jetredline](https://github.com/jet52/jetredline) v4.3.0+ | Memo audit (style, consistency, fact/brief coverage) | Optional |
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
 
 **jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed and `recommend_mode` is enabled, jetmemo automatically invokes jetpanel for close interpretive questions. Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
+
+**jetredline** audits the finished memo (Steps 6.5–6.6). When installed, jetmemo invokes it by default in audit mode: it auto-applies mechanical style edits, surfaces substantive concerns for review, and drafts fill-ins for genuinely-omitted brief arguments. Citation verification is excluded (Step 9 owns it). Opt out with "skip audit." Requires jetredline v4.3.0+ (audit mode); install it separately from the [jetredline repo](https://github.com/jet52/jetredline).
 
 ## Contributing
 

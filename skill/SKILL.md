@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.3.0
+version: 3.4.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -647,6 +647,70 @@ Write the memo to a file in the current working directory:
 
 When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndcourts MCP or pulled from the web — even when the optional Step 9 verification is skipped. If Agent D did not run (no case citations), omit it.
 
+### Step 6.5: jetredline Audit (Default On)
+
+Audit the finished markdown memo with the jetredline skill, then feed its findings back into the draft. This catches prose, consistency, jurisdictional, fact, and argument-coverage issues before the memo is finalized.
+
+**Activation:** Run by default. **Opt out** only if the user's request contains "skip audit," "no audit," or "without audit" — then skip to Step 7.
+
+**Prerequisite:** jetredline must be installed at `~/.claude/skills/jetredline/SKILL.md`. If it is not, skip this step (and Step 6.6) silently and proceed to Step 7.
+
+**Why a separate skill:** jetredline owns the style, consistency, and analytical-rigor rules; invoking it (rather than reimplementing them) means jetmemo inherits its future improvements. **Citation verification is deliberately excluded** — jetmemo's Step 9 is the citation authority, so the audit skips jetredline's Pass 3A/3B to avoid duplicate work.
+
+**Invoke** one subagent (Task tool, `subagent_type: general-purpose`):
+
+> Read the jetredline skill at `~/.claude/skills/jetredline/SKILL.md` and execute it in **audit mode** on this bench memo.
+>
+> - Draft (markdown): `{case_number}_memo.md`
+> - Document type: memo. Output: analysis-only; **write no files**; return results to me inline.
+> - Briefs/record (for Pass 4 fact-check and Pass 6 brief-matching): `[brief/record .pdf paths]`. **Text extractions already exist** as `[corresponding .txt paths]` — use them; do **not** re-run pdftotext.
+> - Run passes **1, 2, 3C, 4, 5, 6**. **Skip Pass 3A/3B** (citation verification is handled separately). **Skip readability metrics** in Pass 5.
+> - Preserve all markdown link syntax; never edit a URL.
+> - Return exactly two parts per jetredline's audit-mode contract: (1) a ```json `edits[]` block of style `replace` edits, then (2) a "Substantive Concerns" markdown section (Jurisdiction, Fact-Check, Brief Coverage, Analytical Rigor, Negative Treatment, Style Notes).
+
+Wait for the subagent (`TaskOutput` with `block: true`). If it fails or times out, note that the audit did not complete and proceed to Step 7 with the un-audited memo — **never block delivery on the audit.**
+
+**Process the results:**
+
+1. **Auto-apply mechanical edits.** For each entry in Part 1 where `type == "replace"` **and** `source_pass == "style"`, apply the change to the markdown by exact `old` → `new` replacement.
+   - If `old` is not found, or matches more than one location, **do not apply** — add it to a "Could not auto-apply (review manually)" list.
+   - Apply only Part 1 style edits this way. Never auto-apply anything from Part 2.
+2. **Surface substantive concerns.** Hold Part 2 for the audit summary below — these are for the user's judgment, not auto-applied. The **Brief Coverage** table feeds Step 6.6.
+
+### Step 6.6: Brief-Gap Remediation
+
+Process the **Brief Coverage** table from the audit (Pass 6) to fill genuinely-omitted arguments before finalizing. This is the audit's highest-value feedback: an argument jetmemo never addressed will not surface in its own Step 5 self-review, because jetmemo builds its issue list from the appellant's framing.
+
+1. **Select gaps.** Take every row marked `Addressed = No` or `Partial`. Then **filter out** rows that are correct omissions — do **not** draft fill-ins for an argument that:
+   - was **waived or not preserved** (per the Step 3 preservation analysis / Agent B's waiver arguments);
+   - is **mooted** by the disposition of another issue;
+   - is **already treated under a different heading** (scan the memo — the brief-matcher can flag a consolidated sub-argument as missing; that is a false positive).
+   
+   Classify the survivors: `No` → **add**; `Partial` → **deepen**.
+
+2. **Draft each fill-in.** Use the appellant/appellee analysis already in context (Agents A/B) first. If the argument's substance is not fully captured there, spawn a focused subagent to read **only** the cited brief span (the page range in the `Brief Source` column, from the existing `.txt`) and return a drafted section. Draft in the memo's format and voice — standard of review, the party's argument, the opposing response, and analysis — with record and authority citations like the rest of the memo.
+
+3. **Insert** each fill-in under the correct issue heading (or as a new sub-point A/B/C), or deepen the existing partial treatment in place.
+
+4. **Do not re-audit** the additions (avoids regress). Their new citations are verified downstream — Step 7 links them and Step 9 verifies them.
+
+### Step 6.7: Reconcile Paragraph Numbering
+
+After Steps 6.5–6.6, the auto-applied edits and any fill-ins may have shifted content. Re-sequence the `[¶N]` markers so numbering is sequential and contiguous throughout the memo. Do this last, immediately before Step 7. Confirm no `[¶N]` is duplicated or skipped.
+
+**Audit summary — present to the user** (after Step 9, with the finished memo):
+
+```
+## Memo Audit (jetredline)
+
+- Auto-applied: N style/grammar edits
+- Arguments filled in: [for each — "Added: {party}'s {argument}, br. pp. X–Y" or "Deepened: …"; or "none"]
+- For your review: [grouped Substantive Concerns — Jurisdiction, Fact-Check, remaining Brief Coverage notes, Analytical Rigor, Negative Treatment]
+- Could not auto-apply: [list, or "none"]
+```
+
+Each filled-in argument must be listed prominently here so it is clearly a second-pass addition open to your scrutiny, not original drafting.
+
 ### Step 7: Link Authority Citations
 
 Hyperlink citations to authority in the memo markdown. This converts bare citation text (e.g., `2024 ND 156`) into markdown links (e.g., `[2024 ND 156](url)`), so they become clickable in the docx output.
@@ -752,6 +816,7 @@ The script's own local/web-only/unresolved counts describe URL *resolution* and 
 - **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be phrased as preliminary staff assessments, clearly stated but deferential to the Court's authority to decide. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.
 - **Use "the Court"** when referring to the ND Supreme Court; **"the district court"** for the lower court.
+- **Audit feedback is graded, not blindly applied** (Steps 6.5–6.6). Auto-apply only the audit's mechanical style edits. Substantive concerns are surfaced for the user. Any argument the audit prompts you to fill in must be drafted only when it is genuinely omitted (not waived, mooted, or already covered) and must be **flagged prominently** in the audit summary as a second-pass addition.
 
 ## Writ Proceedings
 
