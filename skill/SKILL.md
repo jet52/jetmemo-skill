@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.4.0
+version: 3.5.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -62,6 +62,24 @@ The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — 
 
 ---
 
+## The Essential-Documents Rule (non-negotiable)
+
+Some documents must be **read in full** before any analysis, regardless of length, scan quality, or token cost:
+
+1. **Every order and judgment on appeal** — the dispositions under review. These are short and dispositive; there is never an excuse to work from the briefs' description of them.
+2. **Every document on the memo's Quick Reference / key-documents and highly-relevant lists.** If a document is important enough to list for the justices, it is important enough to have been read.
+3. The **relevant portions** of large supporting items (full transcript, full record) — read in part, but read; never assume their contents.
+
+Token efficiency exists to make *thorough* reading affordable. Splitting, text extraction, and parallel agents are tools for reading the whole essential set cheaply — **never** a license to skip it. When efficiency and thoroughness conflict over an essential document, **thoroughness wins, every time.**
+
+- **Never infer** the contents, reasoning, or grounds of an order, judgment, or key document from the parties' briefs. The briefs are advocacy; the order is the ruling.
+- **Hedging is a symptom, not a style.** If you are about to write "the district court *appears to* have," "*seems to* have," or "*evidently*" about the lower court's reasoning, stop — that phrasing means you have not read the order. Read it, then state what it actually says with a pinpoint cite.
+- **A missing essential document is a blocking condition, not a workaround.** If an order or judgment cannot be located in the provided materials, ask the user — do not proceed on inference. If a key document genuinely is not in what was provided, say so explicitly in the memo; never paper over the gap.
+
+This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
+
+---
+
 ## Phase 1: Preparation (Orchestrator, Sequential)
 
 ### Step 0: Scan, Classify, and Split
@@ -105,9 +123,15 @@ The parenthetical (e.g., `(b)`) refers to a subsection within the rule file — 
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
 
+   **Locate the dispositions on review (mandatory — per the Essential-Documents Rule).** The order(s) and judgment(s) being appealed must be found and isolated, even when buried in a large scanned record batch. Do not stop at "no order in the manifest":
+   - Identify the order's/judgment's **record number and date** from the notice of appeal and the briefs' record citations (e.g., "R38").
+   - **Read the record index** (usually the first record item) to map that record number to its page range in the combined batch.
+   - Split with `splitmarks` to isolate it; if the batch has no bookmarks, target that specific page range.
+   - **If the item is image-scanned and text extraction is thin, perform a visual read** (Read tool on the PDF pages directly) — this is mandatory, not "if time permits." Mark it `needs_visual_read` and ensure an agent actually reads it.
+
 4. If **no PDFs** found, ask the user. If many files or ambiguous, confirm with the user.
 
-5. **Build a manifest:** `{path, type, page_count}` for every document. Track this manifest for all subsequent steps.
+5. **Build a manifest:** `{path, type, page_count, essential, read_status}` for every document. Track this manifest for all subsequent steps. Set `essential: true` for every order and judgment on appeal (and add other documents to the essential set in Step 2.5 once the key-documents list exists). Initialize `read_status: unread`; an agent flips it to `read` only after it has actually read the document's text (or visually read its pages). The Step 2.5 gate checks this field.
 
 6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). **Do not ask the user which mode they want.** When the request contains no recommendation trigger, proceed directly to a neutral memo without prompting. This flag controls whether the memo includes a preliminary staff recommendation for each issue. All recommendations must be phrased as preliminary assessments that defer to the Court's authority to decide. If there are close questions, the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
@@ -322,11 +346,11 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > Return only the structured extraction. Do not analyze or recommend.
 
-### Agent C2: District Court Orders (Conditional)
+### Agent C2: District Court Orders (Mandatory)
 
-**Launch only if** district court orders on appeal exist in the manifest.
+**Always launch** whenever the appeal is from a district court order or judgment — which is nearly every appeal. Per the Essential-Documents Rule, the order(s) and judgment(s) on review **must** be read in full; this agent is the vehicle. The only case in which it does not run is one with no order or judgment at all (rare — confirm with the user before skipping). "The order wasn't in the manifest" is **not** a reason to skip — Step 0 requires locating it first, including by visual read of a scanned batch.
 
-**Reads:** district court order text(s) — pass only the specific split record items (e.g., R7, R36, R37), not the full record PDF.
+**Reads:** district court order(s) and judgment(s) text — pass the specific split record items (e.g., R7, R36, R37) isolated in Step 0, not the full record PDF. If an item is `needs_visual_read`, pass the PDF path with instructions to read those pages directly with the Read tool. After reading, the order's/judgment's `read_status` in the manifest becomes `read`.
 
 **Prompt template:**
 
@@ -341,6 +365,8 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - Findings of fact (numbered list with citations)
 > - Conclusions of law
 > - Specific ruling being appealed
+> - **Every separate ground of decision, enumerated**, each with a pinpoint cite (R##:page or :¶) to where the order states it. Courts frequently rule on multiple alternative grounds (e.g., failure of proof, untimeliness, res judicata, misuse of process) — capture **all** of them, and note which the court treats as the **primary/dispositive** ground versus **alternative** grounds.
+> - Any finding the court made that resolves a disputed point (distinguish a *court finding* from a party's *argument* — attribute it to the court, not to a party)
 > - Judge's reasoning for the ruling
 >
 > Return only the structured extraction. Do not analyze or recommend.
@@ -540,10 +566,31 @@ Collect results from all agents. Then:
 
 **Fallback handling:** If any subagent fails or times out, read the relevant document(s) directly in main context and perform that analysis step here. If >50% of documents failed text extraction in Step 1, abandon the parallel approach entirely and fall back to sequential multimodal reads of the PDFs.
 
+### Step 2.5: Essential-Documents Read Gate (blocking)
+
+**GATE: Do not begin legal framing or memo generation until every essential document has been read.** This closes the Essential-Documents Rule with a hard check.
+
+1. **Assemble the essential set:** the union of
+   - every order and judgment on appeal (manifest `essential: true`), and
+   - every document on Agent A's **Key Documents for Quick Reference** list, plus any document an agent flagged as highly relevant to an issue.
+   
+   Mark each of these `essential: true` in the manifest if not already.
+
+2. **Confirm each was actually read.** A document counts as read only if its text (or a visual read of its pages) is present in an agent's returned analysis — not merely named, and not characterized from a brief's description of it.
+
+3. **Read the unread.** For any essential document with `read_status: unread`, launch a targeted read now (Agent C2-style for orders; a focused subagent reading the specific record item for others, using the Step 0 retrieval procedure for scanned/buried items) and **block** until it returns. Then set `read_status: read`.
+
+4. **Handle genuine absence:**
+   - If an **order or judgment** cannot be located in the provided materials, **stop and ask the user** for it — do not proceed on inference.
+   - If a **key/highly-relevant document** is genuinely not in what was provided, note this explicitly (it will be flagged in the memo and to the user) and proceed; never substitute a brief's characterization for the missing document.
+
+Only when the essential set is fully read (or its absence explicitly flagged) may you continue to Step 3.
+
 ### Step 3: Legal Framing
 
 For each consolidated issue:
 
+0. **Ground the issue in the order's actual ruling.** State the district court's actual grounds of decision for this issue from Agent C2's reading of the order — enumerated, with pinpoint cites to the order (R##:page or :¶), distinguishing the primary/dispositive ground from alternative grounds. Do not characterize the ruling from the briefs. If the court decided on a threshold or dispositive ground, say so; the analysis and any recommendation should track how the court actually disposed of the issue rather than treating every sub-question as co-equal.
 1. **Determine correct standard of review** — adjudicate between the parties' positions using Agent D's precedent analysis (if available). If both sides cite the same standard, adopt it. If they disagree, assess which is correct based on the cited authorities.
 2. **Identify the strongest argument supporting the district court's ruling** — articulate the best case for affirmance with specific citations.
 3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
@@ -599,24 +646,32 @@ When multiple record items appear together, hyperlink each separately:
 
 **Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural). In record citations, no space between ¶/¶¶ and the number (per N.D.R.App.P. 30): `¶3`, `¶¶7–14`. In case law citations, include a space (per Bluebook): `¶ 12`, `¶¶ 6–8`.
 
+**Length target (soft):** Aim for a **6–10 page** memo (see `memo-format.md` for the page/word proxy). To reach it, **prune facts not necessary to understand and resolve the issues on appeal** — completeness of *reading* (the Essential-Documents Rule) does not mean completeness of *recounting*. Use judgment on analytical depth: simple cases stay short; genuinely complex or multi-issue cases warrant more. **A memo over 15 pages must be justified** by multiple issues or particularly complicated issues — if it runs long for any other reason, it is over-written; cut. Reading everything essential and then writing tight are the same discipline, not opposites.
+
+**Proof of reading:** State the district court's procedural posture and **each ground of decision** from the order itself, with a pinpoint cite to the order (e.g., `R38:2–9`). If you cannot pinpoint-cite the order's grounds, you have not read it — return to Step 2.5. Attribute court findings to the court, not to a party.
+
 Write the complete bench memo in markdown per `memo-format.md`:
 
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
-2. **Quick Reference** — 4-8 key documents with record citations (from Agent A)
+2. **Quick Reference** — 4-8 key documents with record citations (from Agent A) — every one of which was read per Step 2.5
 3. **Opening [¶1]** — summarize the case and identify all issues. If `recommend_mode`, **bold the preliminary staff recommendation**. Otherwise, state the key tension or question the case presents.
-4. **BACKGROUND** — factual and procedural history with record citations for every assertion
+4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues.
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
    - Standard of review with case authority
    - Appellant's arguments with citations
    - Appellee's arguments with citations
    - Sub-arguments (A, B, C) as needed
-   - Analysis and assessment
+   - Analysis and assessment — tracking the court's actual grounds; where a threshold ground is dispositive, you may note that alternative grounds need not be reached rather than developing each at equal length
 6. **CONCLUSION** — If `recommend_mode`, restate the preliminary staff recommendation in **bold**, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
 
 ### Step 5: Self-Review
 
 Review the memo against this checklist before presenting:
 
+- [ ] **Every order and judgment on appeal was read in full** and is pinpoint-cited; its grounds of decision are stated from the order itself, not the briefs (Essential-Documents Rule / Step 2.5)
+- [ ] **Every Quick Reference / key / highly-relevant document was actually read** — none is characterized solely from a party's brief; any genuinely-absent one is explicitly flagged
+- [ ] **No hedging about the district court's reasoning** ("appears to," "seems," "evidently") — any such phrase is resolved by reading the order, or flagged as a true record gap
+- [ ] **Length is appropriate:** ~6–10 pages typical; facts not needed to resolve the issues are pruned; if over 15 pages, the length is justified by multiple or particularly complex issues
 - [ ] All issues from Step 2 are addressed
 - [ ] Paragraph numbering [¶1], [¶2], etc. is sequential throughout
 - [ ] Every fact in BACKGROUND has a record citation
@@ -791,6 +846,8 @@ The script's own local/web-only/unresolved counts describe URL *resolution* and 
 
 ## Token Efficiency
 
+These strategies make it affordable to read the **whole essential set** thoroughly — they are not a budget to be protected by skipping documents. The Essential-Documents Rule overrides every row below: orders, judgments, and key documents are read in full no matter the cost, and the "fallback" of a visual read on a scanned PDF is **mandatory** for an essential document, not optional. Efficiency buys thoroughness; it never substitutes for it.
+
 | Content           | Strategy                                  | Rationale                            |
 | ----------------- | ----------------------------------------- | ------------------------------------ |
 | Briefs (30-50pp)  | `extract_text.py` -> `.txt`, agent reads text | ~50% token savings vs multimodal PDF |
@@ -808,9 +865,12 @@ The script's own local/web-only/unresolved counts describe URL *resolution* and 
 - If `splitmarks` finds no bookmarks: document stays intact, processed as-is
 - If `splitmarks` output still contains large multi-item files: process as-is, but note in the manifest that granular splitting was not possible
 - If >50% of documents fail text extraction: abandon parallel approach, fall back to sequential multimodal reads
+- **Never** let any fallback drop an essential document (order, judgment, key document). A scanned or unsplittable essential document is read visually, not skipped; a missing one is escalated to the user (Step 2.5), not inferred from the briefs.
 
 ## Important Rules
 
+- **Read the essential documents — never guess them.** Every order, judgment, and key/highly-relevant document is read in full before analysis, regardless of length, scan quality, or token cost (see the Essential-Documents Rule and Step 2.5). Never infer an order's grounds or reasoning from the briefs; never hedge ("appears to," "seems") around a document you could read.
+- **Write tight.** Read everything essential, then recount only what the issues require. ~6–10 pages is typical; prune unnecessary facts; over 15 pages must be justified by multiple or particularly complex issues.
 - **Never fabricate citations.** Only cite cases and authorities that appear in the parties' briefs.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
 - **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be phrased as preliminary staff assessments, clearly stated but deferential to the Court's authority to decide. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.

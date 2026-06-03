@@ -57,6 +57,16 @@ sentence.** Briefly summarize the key reasons. Otherwise: Summarize the key
 analytical considerations for each issue without stating a preferred outcome.}
 ```
 
+## Length (soft guideline)
+
+- **Typical memo: 6–10 pages.** This is a target, not a hard cap.
+- To reach it, **prune facts not necessary to understand and resolve the issues on appeal.** Reading every essential document in full (the Essential-Documents Rule) is required; *recounting* all of it is not. The BACKGROUND should carry only the facts the issues turn on.
+- **Use judgment on analytical depth.** Simple cases stay short. Genuinely complex or multi-issue cases warrant more development — depth that the disposition actually needs, not depth for its own sake.
+- **Over 15 pages must be justified** by multiple issues or particularly complicated issues. If a memo runs that long for any other reason, it is over-written — cut.
+- Where a threshold ground disposes of an issue, it is appropriate to note that alternative grounds need not be reached rather than developing each at equal length.
+
+**Page/word proxy (while drafting in markdown):** the bench-memo template (QTPalatine 13pt, 1.2 line spacing, justified) renders at *roughly* 350–450 words per page — so ~6–10 pages is approximately **2,500–4,000 words** of body text, and 15 pages is roughly **5,500–6,500 words**. Treat these as approximate; the rendered `.docx` page count (SKILL Step 8) is the authority. If unsure, render and check.
+
 ## Formatting Rules
 
 ### Paragraph Numbering
