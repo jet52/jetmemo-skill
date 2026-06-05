@@ -590,7 +590,7 @@ def convert(md_path, docx_path):
     today_str = date.today().strftime("%B %d, %Y").replace(" 0", " ")
 
     addr_lines = [
-        ("To:", "Justice Tufte"),
+        ("To:", "Justice Bartholomew"),
         ("From:", meta["author"] or "Claude (AI first draft)"),
         ("Date:", today_str),
     ]

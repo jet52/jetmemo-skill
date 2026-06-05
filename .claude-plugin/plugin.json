@@ -1,0 +1,8 @@
+{
+  "name": "jetmemo",
+  "version": "3.7.0",
+  "description": "Generate North Dakota Supreme Court bench memos from publicly filed appellate briefs and record documents.",
+  "author": { "name": "JET" },
+  "homepage": "https://github.com/jet52/jetmemo-skill",
+  "skills": "./skill"
+}
