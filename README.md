@@ -1,6 +1,19 @@
 # JetMemo Skill
 
-Generate bench memos from publicly filed briefs and trial court record documents. Analyzes briefs, notices of appeal, and orders to produce structured bench memos for oral argument preparation. Under continuous development, this tool assists with the most tedious and repetitive parts of case preparation (checking whether cited sources support legal or factual assertions) to help the human decision maker make better decisions.  Unlike many clerk-prepared bench memos, memos prepared by this tool make no recommendation unless specifically requested.  Recommended for use by courts to cross-check their internal work or by litigants to think about how courts may be breaking down the issues in a case.  Just clone this repo and ask Claude to tailor it to your jurisdiction.
+Generate bench memos from publicly filed briefs and trial court record documents. Analyzes briefs, notices of appeal, and orders to produce structured bench memos for oral argument preparation. Under continuous development, this tool assists with the most tedious and repetitive parts of case preparation (checking whether cited sources support legal or factual assertions) to help the human decision maker make better decisions.  Unlike many clerk-prepared bench memos, memos prepared by this tool make no recommended disposition.  By default they assess which side has the stronger argument — and whether it is more consistent with the text, precedent, and established interpretive principles — stated with appropriate hedging and confidence levels, never as a recommendation on how to rule.  Ask for a neutral, both-sides-only memo to suppress the assessment.  Recommended for use by courts to cross-check their internal work or by litigants to think about how courts may be breaking down the issues in a case.  Just clone this repo and ask Claude to tailor it to your jurisdiction.
+
+## Not an Official Court Product
+
+JetMemo is an independent, open-source project published by an individual in a
+personal capacity as legal-educational software, consistent with Rule 3.1 of the
+North Dakota Code of Judicial Conduct. It is not authorized, endorsed, or
+maintained by the North Dakota Supreme Court or the state court system, and is
+being developed without court staff, equipment, or resources. It operates only on
+publicly filed documents — do not input sealed, confidential, juvenile, or other
+non-public material. Its output is machine-generated: any assessment of which
+argument is stronger speaks only to argument quality and doctrinal fit, and is
+neither the view of the Court or any judge nor a prediction or recommendation of
+how any case should or will be decided. It is not legal advice.
 
 ## Caution: Privacy Settings Before Use (turn off use of training data)
 
@@ -163,7 +176,7 @@ In Cowork, `~/refs` doesn't persist across sessions. To use local references, mo
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
 
-**jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed and `recommend_mode` is enabled, jetmemo automatically invokes jetpanel for close interpretive questions. Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
+**jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed, jetmemo automatically invokes jetpanel for close interpretive questions (now the default; suppressed only in neutral mode). Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
 
 **jetredline** audits the finished memo (Steps 6.5–6.6). When installed, jetmemo invokes it by default in audit mode: it auto-applies mechanical style edits, surfaces substantive concerns for review, and drafts fill-ins for genuinely-omitted brief arguments. Citation verification is excluded (Step 9 owns it). Opt out with "skip audit." Requires jetredline v4.4.0+ (audit mode); install it separately from the [jetredline repo](https://github.com/jet52/jetredline).
 

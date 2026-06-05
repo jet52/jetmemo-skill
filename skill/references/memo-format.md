@@ -17,8 +17,9 @@
   [4-8 items total]
 
 [¶1] {Opening paragraph: summarize the case in 2-3 sentences and identify all
-issues on appeal. If recommend_mode, state the recommendation and **bold the
-recommendation sentence.** Otherwise, state the central question or tension.}
+issues on appeal. If strength_mode (default), summarize each issue's strength
+assessment with its confidence level (state no recommended disposition).
+Otherwise, state the central question or tension.}
 
 ## BACKGROUND
 
@@ -52,9 +53,10 @@ recommendation sentence.** Otherwise, state the central question or tension.}
 
 ## CONCLUSION
 
-[¶last] {If recommend_mode: Restate recommendation. **Bold the recommendation
-sentence.** Briefly summarize the key reasons. Otherwise: Summarize the key
-analytical considerations for each issue without stating a preferred outcome.}
+[¶last] {If strength_mode (default): Restate each issue's strength assessment
+with its confidence level and the qualifications that bear on it. State no
+recommended disposition. Otherwise: Summarize the key analytical considerations
+for each issue without assessing which side is stronger.}
 ```
 
 ## Length (soft guideline)
@@ -82,17 +84,18 @@ analytical considerations for each issue without stating a preferred outcome.}
 - Issue headings use **Roman numerals**: `## I.`, `## II.`, `## III.`
 - Sub-arguments use **letters**: `### A.`, `### B.`, `### C.`
 
-### Recommendations (recommend_mode only)
+### Strength assessment (strength_mode, default)
 
-When `recommend_mode` is enabled:
+When `strength_mode` is enabled (default):
 
-- State recommendation in [¶1] — **bold** the sentence
-- Restate recommendation in CONCLUSION — **bold** the sentence
-- Use language like: "**The Court should affirm...**" or "**The Court should reverse...**"
+- Assess which side has the stronger argument and whether it is more consistent with the text, precedent, and established interpretive principles
+- State the assessment with explicit qualifications, hedging, and a confidence level (high / moderate / low); note what would change it and any reason the stronger argument may not carry the outcome
+- Summarize the assessment in [¶1] and restate it in CONCLUSION
+- **Never** state or imply a recommended disposition — do not write "The Court should affirm/reverse/remand" or that the Court should rule a particular way
 
-When `recommend_mode` is disabled (default):
+When `strength_mode` is disabled (neutral mode):
 
-- Do NOT state a recommended disposition
+- Do NOT assess which side is stronger
 - End analysis with both sides' strongest positions
 - ¶1 should identify the central question, not a conclusion
 - CONCLUSION should summarize the analytical framework, not a result
@@ -147,7 +150,7 @@ Each must include:
 2. **Standard of review** — with specific case authority from the briefs
 3. **Appellant's arguments** — with citations to briefs and record
 4. **Appellee's arguments** — with citations to briefs and record
-5. **Analysis** — strongest argument for the district court's ruling, then strongest counterargument, then assessment. If `recommend_mode`, add recommendation.
+5. **Analysis** — strongest argument for the district court's ruling, then strongest counterargument, then assessment. If `strength_mode` (default), add the strength assessment with its confidence level; never a recommended disposition.
 
 Template:
 
@@ -165,8 +168,9 @@ If unpreserved, note the applicable standard (plain error, etc.).}
 [¶N+3] {Appellee's arguments with citations to briefs and record.}
 
 [¶N+4] **Analysis:** {Strongest argument for the district court's ruling.
-Then the strongest counterargument. Then assessment. If recommend_mode,
-state recommended disposition.}
+Then the strongest counterargument. Then assessment. If strength_mode (default),
+state which side is stronger with a confidence level and qualifications;
+never a recommended disposition.}
 ```
 
 #### Interpretive Panel Section (Optional)

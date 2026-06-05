@@ -137,7 +137,7 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
 5. **Build a manifest:** `{path, type, page_count, essential, read_status}` for every document. Track this manifest for all subsequent steps. Set `essential: true` for every order and judgment on appeal (and add other documents to the essential set in Step 2.5 once the key-documents list exists). Initialize `read_status: unread`; an agent flips it to `read` only after it has actually read the document's text (or visually read its pages). The Step 2.5 gate checks this field.
 
-6. **Recommendation mode:** Scan the user's request for trigger keywords: "with recommendation(s)", "recommend", or "take a position." If found, set `recommend_mode: true`. Otherwise, `recommend_mode: false` (default). **Do not ask the user which mode they want.** When the request contains no recommendation trigger, proceed directly to a neutral memo without prompting. This flag controls whether the memo includes a preliminary staff recommendation for each issue. All recommendations must be phrased as preliminary assessments that defer to the Court's authority to decide. If there are close questions, the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
+6. **Strength assessment mode:** Default `strength_mode: true`. Scan the user's request for suppression keywords: "neutral", "no assessment", "both sides only", "without assessment", or "no strength assessment." If found, set `strength_mode: false`. **Do not ask the user which mode they want.** When the request contains no suppression keyword, proceed directly with the strength assessment without prompting. When `strength_mode` is enabled, the memo assesses, for each issue, which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — stated with appropriate qualifications, hedging, and an explicit confidence level (high / moderate / low), and **never** as a recommended disposition. When suppressed, the memo presents both sides' strongest positions without assessing which is stronger. In either mode, if there are close questions the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
 ### Step 1: Read References and Extract Text
 
@@ -594,20 +594,20 @@ Only when the essential set is fully read (or its absence explicitly flagged) ma
 
 For each consolidated issue:
 
-0. **Ground the issue in the order's actual ruling.** State the district court's actual grounds of decision for this issue from Agent C2's reading of the order — enumerated, with pinpoint cites to the order (R##:page or :¶), distinguishing the primary/dispositive ground from alternative grounds. Do not characterize the ruling from the briefs. If the court decided on a threshold or dispositive ground, say so; the analysis and any recommendation should track how the court actually disposed of the issue rather than treating every sub-question as co-equal.
+0. **Ground the issue in the order's actual ruling.** State the district court's actual grounds of decision for this issue from Agent C2's reading of the order — enumerated, with pinpoint cites to the order (R##:page or :¶), distinguishing the primary/dispositive ground from alternative grounds. Do not characterize the ruling from the briefs. If the court decided on a threshold or dispositive ground, say so; the analysis and any strength assessment should track how the court actually disposed of the issue rather than treating every sub-question as co-equal.
 1. **Determine correct standard of review** — adjudicate between the parties' positions using Agent D's precedent analysis (if available). If both sides cite the same standard, adopt it. If they disagree, assess which is correct based on the cited authorities.
 2. **Identify the strongest argument supporting the district court's ruling** — articulate the best case for affirmance with specific citations.
 3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
 4. **Assess preservation** — if there's a waiver/preservation dispute, analyze it before reaching the merits.
 5. **Flag statutory interpretation issues** — if the issue turns on statutory text, identify the interpretive question, the competing readings, and any relevant canons.
-6. **If `recommend_mode` is enabled**, determine a preliminary recommended disposition — affirm, reverse, or remand — with reasoning. Frame the recommendation as a preliminary staff assessment, deferential to the Court's authority to decide. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If disabled, end the analysis after presenting both sides' strongest positions without stating a preferred outcome.
+6. **If `strength_mode` is enabled (default)**, assess which side has the stronger argument on this issue and whether it is more consistent with the text, precedent, and established interpretive principles, with reasoning. State the assessment with appropriate qualifications and hedging and an explicit confidence level (high / moderate / low), and note what would change it. Do **not** state or imply a recommended disposition — do not say the ruling should be affirmed, reversed, or remanded, or that the Court should rule a particular way; the assessment addresses argument strength and doctrinal fit, not how the case should be decided. Where the stronger argument may still not carry the outcome (e.g., a preservation problem, the standard of review, or a dispositive threshold ground), say so and lower the confidence accordingly. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If `strength_mode` is disabled, end the analysis after presenting both sides' strongest positions without assessing which is stronger.
 
 ### Step 3.5: Interpretive Panel (Optional)
 
 **Prerequisite:** The jetpanel skill must be installed at `~/.claude/skills/jetpanel/SKILL.md`. If it is not installed, skip this step silently.
 
 **Activation:** Run this step when ALL of the following are true:
-1. `recommend_mode` is enabled
+1. `strength_mode` is enabled (default)
 2. Step 3 identified a close interpretive question — one where the legal framing shows strong arguments on both sides of a statutory or constitutional interpretation issue, competing canons, or genuine textual ambiguity
 
 **How to invoke:** Spawn a subagent using the Agent tool with the following instructions:
@@ -699,7 +699,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
 
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
 2. **Quick Reference** — 4-8 key documents with record citations (from Agent A) — every one of which was read per Step 2.5
-3. **Opening [¶1]** — summarize the case and identify all issues. If `recommend_mode`, **bold the preliminary staff recommendation**. Otherwise, state the key tension or question the case presents.
+3. **Opening [¶1]** — summarize the case and identify all issues. If `strength_mode` (default), summarize each issue's strength assessment with its confidence level (state no recommended disposition). Otherwise, state the key tension or question the case presents.
 4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues.
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
    - Standard of review with case authority
@@ -708,7 +708,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
    - Sub-arguments (A, B, C) as needed
    - Analysis and assessment — tracking the court's actual grounds; where a threshold ground is dispositive, you may note that alternative grounds need not be reached rather than developing each at equal length
    - Any **supplemental authority from Step 3.6 (Agent F)** bearing on the issue, woven into the analysis and **tagged as the memo's addition** ("(not cited by the parties)")
-6. **CONCLUSION** — If `recommend_mode`, restate the preliminary staff recommendation in **bold**, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without stating a preferred outcome.
+6. **CONCLUSION** — If `strength_mode` (default), restate each issue's strength assessment with its confidence level and the qualifications that bear on it, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without assessing which side is stronger.
 
 ### Step 5: Self-Review
 
@@ -729,9 +729,10 @@ Review the memo against this checklist before presenting:
 - [ ] Each issue analysis identifies the strongest argument for and against the district court
 - [ ] Exhibit table included if ≥ 2 contested exhibits
 - [ ] Writ terminology used correctly if writ proceeding
-- [ ] If `recommend_mode`: preliminary staff recommendation appears in ¶1 (bold) and CONCLUSION (bold), phrased as a preliminary assessment deferential to the Court, aim is to assist the Court in making a wise, legally sound decision by focusing on the most relevant facts and law.
-- [ ] If `recommend_mode` with close questions: suggested oral argument questions appear in CONCLUSION
-- [ ] If not `recommend_mode`: memo does NOT state a preferred disposition; analysis ends with both sides' positions
+- [ ] **No recommended disposition in any mode** — the memo never states or implies that the ruling should be affirmed, reversed, or remanded, or that the Court should rule a particular way.
+- [ ] If `strength_mode` (default): each issue's strength assessment appears in ¶1 and CONCLUSION, stated with an explicit confidence level (high / moderate / low) and the qualifications that bear on it.
+- [ ] If `strength_mode` with close questions: suggested oral argument questions appear in CONCLUSION
+- [ ] If neutral mode (`strength_mode` disabled): memo does NOT assess which side is stronger; analysis ends with both sides' positions
 - [ ] No placeholder brackets like [Date], [page], [County]
 - [ ] Every citation is verified (exists and supports the proposition); any authority not cited by the parties is verified with extra care and flagged as the memo's addition
 - [ ] Citation formats are correct (see style-spec.md)
@@ -929,7 +930,7 @@ These strategies make it affordable to read the **whole essential set** thorough
 - **Write tight.** Read everything essential, then recount only what the issues require. ~6–10 pages is typical; prune unnecessary facts; over 15 pages must be justified by multiple or particularly complex issues.
 - **Never fabricate citations; verify every citation.** Cite a case, statute, or rule only after confirming it exists and says what it is cited for — via the ndcourts MCP, a local `~/refs` source, or another authoritative source. This is an anti-fabrication and verification rule, **not** a briefs-only rule. The memo may and often should cite relevant authority the parties did not cite: identifying on-point cases, statutes, or rules the parties missed is part of assisting the Court in applying the correct law consistent with its own precedent, regardless of what the parties briefed. When citing authority neither party cited, verify it with extra care and make clear (in text or a parenthetical) that it was not cited by the parties, so the reader knows it is the memo's addition.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
-- **Be neutral.** Present both sides fairly before offering analysis. If `recommend_mode`, recommendations should be phrased as preliminary staff assessments, clearly stated but deferential to the Court's authority to decide. If not, the memo should present the strongest arguments for each position and leave the disposition to the Court.
+- **Be neutral; never recommend a disposition.** Present both sides fairly before offering analysis. The memo never states or implies a recommended disposition (no affirm/reverse/remand recommendation; never that the Court should rule a particular way) in any mode. In `strength_mode` (default), it may assess which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — always with explicit qualifications, hedging, and confidence levels, and always leaving the disposition to the Court. In neutral mode it presents the strongest arguments for each position and leaves the assessment to the reader.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.
 - **Use "the Court"** when referring to the ND Supreme Court; **"the district court"** for the lower court.
 - **Audit feedback is graded, not blindly applied** (Steps 6.5–6.6). Auto-apply only the audit's mechanical style edits. Substantive concerns are surfaced for the user. Any argument the audit prompts you to fill in must be drafted only when it is genuinely omitted (not waived, mooted, or already covered) and must be **flagged prominently** in the audit summary as a second-pass addition.

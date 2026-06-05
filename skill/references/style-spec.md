@@ -130,11 +130,11 @@ All citations — case law, record, statutory — should be as precise as possib
 
 - **Neutral, analytical tone** throughout
 - Present both sides fairly before offering assessment
-- When `recommend_mode` is enabled, recommendations should be clearly stated but appropriately hedged
-- When `recommend_mode` is disabled (default), present both sides' strongest positions without stating a preferred outcome
+- When `strength_mode` is enabled (default), the strength assessment should be clearly stated but appropriately hedged, with explicit qualifications and a confidence level (high / moderate / low), and never phrased as a recommended disposition
+- When `strength_mode` is disabled (neutral mode), present both sides' strongest positions without assessing which is stronger
 - Use **"the Court"** when referring to the ND Supreme Court
 - Use **"the district court"** for the lower court
-- Do not use "I" or "we" — write in the third person or use passive voice for recommendations (e.g., "The Court should affirm...")
+- Do not use "I" or "we" — write in the third person (e.g., "the stronger argument is...," "the appellant's reading fits the text better")
 - Avoid legalese: no "herein," "wherefore," "aforementioned," "said" as a pronoun
 - Active voice unless passive genuinely improves readability
 - Use the Oxford comma
