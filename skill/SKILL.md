@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.7.1
+version: 3.8.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -171,6 +171,8 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    The output is a JSON array. Each entry has `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`. Case entries also carry `antecedent_name` (the case name preceding the cite — a heuristic, may be `null`) and, for parallel citations, `parallel_cite`, `redundant_parallel`, and `primary_cite` (entries marked `redundant_parallel: true` are a parallel form of `primary_cite` — the same case). Use `cite_type` to determine which agents to launch:
    - Any `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter` → launch Agent D
    - Any `cite_type` in `statute`, `statute_chapter`, `regulation`, `court_rule`, `constitution` → launch Agent E
+
+   **Pin-cite entries.** Entries with `cite_type: "pin_cite"` are Bluebook short forms from the briefs (`491 F.3d at 363`, `Goss at 365`, `Niemeyer, ¶ 12`, `Id. ¶ 15`) back-referencing an earlier full citation. They carry `parent_normalized` (the full cite they point to), `pin_page` or `pin_paragraph`, and — when resolved — `parent_local_path`/`parent_local_exists` (pins have no refs file of their own; read the parent's). Pass resolved pin entries to Agent D alongside their parents so the pin page/paragraph can be checked against the parent opinion. Entries with a `pin_warning` field are **unresolved short forms** (no earlier full cite matches — e.g. a transposed volume number, or an `Id.` after an ambiguous string cite): treat each as a likely citation defect in the brief and note it in the memo's citation-check section. Pin entries never launch Agent E and are never cached.
 
 ---
 
@@ -421,6 +423,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - `search_hint`: text to match within the file
 > - `antecedent_name`: best-effort case name preceding the cite (e.g. "State v. Smith"). Heuristic — may be `null`; use it to identify the case and to sanity-check the lookup.
 > - `redundant_parallel` / `primary_cite`: if `redundant_parallel` is `true`, this entry is a parallel citation form of `primary_cite` (the same case). Verify the `primary_cite` entry once; do not separately verify the redundant one.
+> - `cite_type: "pin_cite"` entries are short-form back-references (`491 F.3d at 363`, `Id. ¶ 15`) to the full cite named in `parent_normalized`. Do not look them up independently — open the parent's opinion (`parent_local_path` when `parent_local_exists`, else the parent entry's `url`) and confirm the cited `pin_page`/`pin_paragraph` exists and supports the proposition. An entry with `pin_warning` is an unresolved short form — report it as a probable citation error in the brief (check whether a digit-transposed volume or a different case was intended).
 >
 > ---
 >

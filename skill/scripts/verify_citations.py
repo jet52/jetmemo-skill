@@ -50,14 +50,23 @@ except ImportError as e:
 # Public API
 # ---------------------------------------------------------------------------
 
-def scan_citations(text: str, refs_dir: str = "~/refs") -> list[dict]:
-    """Scan text for all citations. Returns legacy-format dicts."""
+def scan_citations(text: str, refs_dir: str = "~/refs",
+                   include_pin_cites: bool = True) -> list[dict]:
+    """Scan text for all citations. Returns legacy-format dicts.
+
+    Pin-cite short forms ("491 F.3d at 363", "Goss at 365", "Id. ¶ 14")
+    appear as entries with cite_type "pin_cite", linked to their parent full
+    cite via parent_normalized (None = unresolved — likely a drafting error).
+    Pin entries never carry their own local file; verification reads the
+    parent's cached opinion (parent_local_path / parent_local_exists).
+    """
     refs = Path(refs_dir).expanduser()
-    citations = scan_text(text, refs_dir=refs)
+    citations = scan_text(text, refs_dir=refs, include_pin_cites=include_pin_cites)
 
     entries = [to_legacy_dict(c, refs) for c in citations]
     add_parallel_info(entries, citations)
     mark_redundant_parallels(entries)
+    annotate_pin_cites(entries)
 
     return entries
 
@@ -107,6 +116,35 @@ def mark_redundant_parallels(entries: list[dict]) -> None:
         secondary["primary_cite"] = primary["normalized"]
 
 
+def annotate_pin_cites(entries: list[dict]) -> None:
+    """Attach parent context to pin-cite entries.
+
+    Pin cites carry no local file of their own; Agent D verifies the pin
+    page/paragraph against the parent's cached opinion, so each resolved pin
+    gets ``parent_local_path``/``parent_local_exists`` copied from its parent
+    entry. Unresolved pins (explicit short form with no matching earlier full
+    cite — e.g. a digit-transposed volume) get ``pin_warning`` so the
+    orchestrator surfaces them as defects.
+    """
+    by_norm = {}
+    for e in entries:
+        if e["cite_type"] != "pin_cite":
+            by_norm.setdefault(e["normalized"], e)
+    for e in entries:
+        if e["cite_type"] != "pin_cite":
+            continue
+        parent_norm = e.get("parent_normalized")
+        if parent_norm is None:
+            e["pin_warning"] = (
+                "unresolved short form: no earlier full citation matches"
+            )
+            continue
+        parent = by_norm.get(parent_norm)
+        if parent is not None:
+            e["parent_local_path"] = parent.get("local_path")
+            e["parent_local_exists"] = parent.get("local_exists", False)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -120,6 +158,10 @@ def main():
                         help="Override refs directory (default: ~/refs)")
     parser.add_argument("--json", action="store_true", default=False,
                         help="Output as JSON")
+    parser.add_argument("--pin-cites", action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="Include pin-cite short forms linked to their "
+                             "parent cites (default: on; --no-pin-cites to disable)")
     args = parser.parse_args()
 
     if args.file:
@@ -131,25 +173,33 @@ def main():
     else:
         text = sys.stdin.read()
 
-    results = scan_citations(text, refs_dir=args.refs_dir)
+    results = scan_citations(text, refs_dir=args.refs_dir,
+                             include_pin_cites=args.pin_cites)
 
     if args.json:
         print(json.dumps(results, indent=2, ensure_ascii=False))
     else:
-        local = sum(1 for r in results if r.get("local_exists"))
-        web = sum(1 for r in results if r.get("url") and not r.get("local_exists"))
-        unresolved = sum(1 for r in results if not r.get("local_exists") and not r.get("url"))
-        redundant = sum(1 for r in results if r.get("redundant_parallel"))
+        pins = [r for r in results if r["cite_type"] == "pin_cite"]
+        fulls = [r for r in results if r["cite_type"] != "pin_cite"]
+        local = sum(1 for r in fulls if r.get("local_exists"))
+        web = sum(1 for r in fulls if r.get("url") and not r.get("local_exists"))
+        unresolved = sum(1 for r in fulls if not r.get("local_exists") and not r.get("url"))
+        redundant = sum(1 for r in fulls if r.get("redundant_parallel"))
+        pin_warnings = sum(1 for r in pins if r.get("pin_warning"))
 
         print(f"\nCitation Scan Results")
         print(f"{'=' * 40}")
-        summary = f"Total: {len(results)} | Local: {local} | Web only: {web} | Unresolved: {unresolved}"
+        summary = f"Total: {len(fulls)} | Local: {local} | Web only: {web} | Unresolved: {unresolved}"
         if redundant:
             summary += f" | Parallel dups: {redundant}"
+        if pins:
+            summary += f" | Pin cites: {len(pins)}"
+            if pin_warnings:
+                summary += f" ({pin_warnings} UNRESOLVED)"
         print(summary)
 
         by_type: dict[str, list[dict]] = {}
-        for r in results:
+        for r in fulls:
             by_type.setdefault(r["cite_type"], []).append(r)
 
         for ctype, cites in sorted(by_type.items()):
@@ -161,6 +211,15 @@ def main():
                 if r.get("redundant_parallel"):
                     label += f"  (parallel of {r['primary_cite']})"
                 print(f"  [{status:5s}] {label}")
+
+        if pins:
+            print(f"\nPIN_CITE ({len(pins)}):")
+            for r in pins:
+                if r.get("pin_warning"):
+                    print(f"  [WARN ] {r['normalized']}  ⚠ {r['pin_warning']}")
+                else:
+                    where = "parent local" if r.get("parent_local_exists") else "parent url"
+                    print(f"  [{'ok':5s}] {r['normalized']}  → {r['parent_normalized']} ({where})")
 
 
 if __name__ == "__main__":

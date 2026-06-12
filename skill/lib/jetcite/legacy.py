@@ -45,6 +45,11 @@ AUTHORITY_TYPES = frozenset({
     "statute", "statute_chapter", "regulation", "constitution", "court_rule",
 })
 
+# Pin-cite short forms ("491 F.3d at 363", "Id. ¶ 14"). Deliberately NOT in
+# CASE_TYPES: consumer auto-cache loops must skip pins — they inherit the
+# parent's sources and never get their own refs files.
+PIN_CITE_TYPE = "pin_cite"
+
 
 def legacy_cite_type(c: Citation) -> str:
     """Map a jetcite Citation to a legacy cite_type string.
@@ -52,6 +57,9 @@ def legacy_cite_type(c: Citation) -> str:
     Uses CitationType, jurisdiction, and components to produce a generic
     classification string used for agent routing and display.
     """
+    if c.is_pin_cite:
+        return PIN_CITE_TYPE
+
     if c.cite_type == CitationType.CASE:
         # Neutral citations: have year+number, no reporter
         if "year" in c.components and "number" in c.components and "reporter" not in c.components:
@@ -166,7 +174,25 @@ def to_legacy_dict(c: Citation, refs_dir: Path) -> dict:
         "search_hint": search_hint(c, ct),
         "pinpoint": c.pinpoint,
         "antecedent_name": c.antecedent_name,
+        # Character offset into preprocess_document_text(text) — consumers
+        # mapping positions back to the document must preprocess identically.
+        "position": c.position,
     }
+
+    if c.is_repeat:
+        # Repeat occurrences carry no refs file of their own; consumers
+        # follow parent_normalized to the first-occurrence entry.
+        entry["is_repeat"] = True
+        entry["parent_normalized"] = c.parent_normalized
+
+    if c.is_pin_cite:
+        # Pin cites carry no refs file of their own; consumers follow
+        # parent_normalized to the parent entry (None = unresolved short form).
+        entry["parent_normalized"] = c.parent_normalized
+        if c.pin_page:
+            entry["pin_page"] = c.pin_page
+        if c.pin_paragraph:
+            entry["pin_paragraph"] = c.pin_paragraph
 
     rel = citation_path(c)
     if rel is not None:
@@ -181,17 +207,27 @@ def to_legacy_dict(c: Citation, refs_dir: Path) -> dict:
 
 
 def add_parallel_info(entries: list[dict], citations: list[Citation]) -> None:
-    """Add parallel_cite and preferred fields to legacy entries."""
-    norm_to_entry = {e["normalized"]: e for e in entries}
+    """Add parallel_cite and preferred fields to legacy entries.
 
-    for cite in citations:
+    ``entries`` must be the element-wise conversion of ``citations``
+    (same order). Repeat occurrences get their own parallel_cite link —
+    occurrence-level data — but are excluded from the normalized-form map
+    and the preferred-source marking, which are authority-level concepts
+    that belong to the first occurrence.
+    """
+    norm_to_entry = {
+        e["normalized"]: e for e in entries
+        if not e.get("is_repeat") and e.get("cite_type") != PIN_CITE_TYPE
+    }
+
+    for entry, cite in zip(entries, citations):
         if not cite.parallel_cites:
-            continue
-        entry = norm_to_entry.get(cite.normalized)
-        if entry is None:
             continue
 
         entry["parallel_cite"] = cite.parallel_cites[0]
+
+        if cite.is_repeat or cite.is_pin_cite:
+            continue
 
         if entry.get("local_exists"):
             entry["preferred"] = True

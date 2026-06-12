@@ -40,6 +40,14 @@ def _format_table(citations: list[Citation], all_sources: bool = False) -> str:
             verified = " ✓" if cite.sources[0].verified else " ✗"
         lines.append(f"  {i:>3}  {cite.normalized:<30} {cite.cite_type.value:<14} {url}{verified}")
 
+        if cite.is_pin_cite:
+            if cite.parent_normalized:
+                lines.append(f"       {'':30} ↪ pin of {cite.parent_normalized}")
+            else:
+                lines.append(f"       {'':30} ↪ UNRESOLVED short form")
+        elif cite.is_repeat:
+            lines.append(f"       {'':30} ↪ repeat of {cite.parent_normalized}")
+
         if cite.parallel_cites:
             lines.append(f"       {'':30} {'= ' + ', '.join(cite.parallel_cites)}")
 
@@ -96,6 +104,10 @@ def main(ctx):
               help="Check local reference cache at this directory.")
 @click.option("--fetch", "do_fetch", is_flag=True,
               help="Fetch citation content from web and cache locally (requires --refs-dir).")
+@click.option("--pin-cites", "pin_cites", is_flag=True,
+              help="Include Bluebook pin-cite short forms (e.g. '491 F.3d at 363', 'Id. ¶ 14') linked to their parent cites (scan mode only).")
+@click.option("--occurrences", "occurrences", is_flag=True,
+              help="Include repeat full-form case cites (second and later appearances) linked to their first occurrence (scan mode only).")
 def cite_cmd(
     citation: str | None,
     scan_file: str | None,
@@ -106,6 +118,8 @@ def cite_cmd(
     all_sources: bool,
     refs_dir: str | None,
     do_fetch: bool,
+    pin_cites: bool,
+    occurrences: bool,
 ):
     """Parse legal citations and generate URLs to official sources."""
     refs_path = Path(refs_dir).expanduser() if refs_dir else None
@@ -121,7 +135,8 @@ def cite_cmd(
         else:
             with open(scan_file) as f:
                 text = f.read()
-        citations = scan_text(text, refs_dir=refs_path)
+        citations = scan_text(text, refs_dir=refs_path, include_pin_cites=pin_cites,
+                              include_occurrences=occurrences)
         if fmt is None:
             fmt = "table"
     elif from_clipboard:
