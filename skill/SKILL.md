@@ -172,7 +172,7 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    - Any `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter` → launch Agent D
    - Any `cite_type` in `statute`, `statute_chapter`, `regulation`, `court_rule`, `constitution` → launch Agent E
 
-   **Pin-cite entries.** Entries with `cite_type: "pin_cite"` are Bluebook short forms from the briefs (`491 F.3d at 363`, `Goss at 365`, `Niemeyer, ¶ 12`, `Id. ¶ 15`) back-referencing an earlier full citation. They carry `parent_normalized` (the full cite they point to), `pin_page` or `pin_paragraph`, and — when resolved — `parent_local_path`/`parent_local_exists` (pins have no refs file of their own; read the parent's). Pass resolved pin entries to Agent D alongside their parents so the pin page/paragraph can be checked against the parent opinion. Entries with a `pin_warning` field are **unresolved short forms** (no earlier full cite matches — e.g. a transposed volume number, or an `Id.` after an ambiguous string cite): treat each as a likely citation defect in the brief and note it in the memo's citation-check section. Pin entries never launch Agent E and are never cached.
+   **Pin-cite entries.** Entries with `cite_type: "pin_cite"` are Bluebook short forms from the briefs (`491 F.3d at 363`, `Goss at 365`, `Niemeyer, ¶ 12`, `Id. ¶ 15`, bare `Rule 60(b)`) back-referencing an earlier full citation. They carry `parent_normalized` (the full cite they point to), `pin_page` or `pin_paragraph`, and — when resolved — `parent_local_path`/`parent_local_exists` (pins have no refs file of their own; read the parent's). The parent is not always a case: an `Id.` after a rule/statute/constitution cite, and a bare `Rule 60(b)` short form (attributed to its rule set — parent like `N.D.R.Civ.P. 60`, subdivision in `pinpoint`), resolve to that authority. Route each resolved pin with its parent's verifier — Agent D for case parents, Agent E for rule/statute/constitution parents — so the pinpoint can be checked against the parent's text. Entries with a `pin_warning` field are **unresolved short forms** (no earlier full cite matches — e.g. a transposed volume number, or an `Id.` after an ambiguous string cite): treat each as a likely citation defect in the brief and note it in the memo's citation-check section. Pin entries themselves never launch a standalone agent and are never cached.
 
 ---
 
@@ -423,7 +423,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - `search_hint`: text to match within the file
 > - `antecedent_name`: best-effort case name preceding the cite (e.g. "State v. Smith"). Heuristic — may be `null`; use it to identify the case and to sanity-check the lookup.
 > - `redundant_parallel` / `primary_cite`: if `redundant_parallel` is `true`, this entry is a parallel citation form of `primary_cite` (the same case). Verify the `primary_cite` entry once; do not separately verify the redundant one.
-> - `cite_type: "pin_cite"` entries are short-form back-references (`491 F.3d at 363`, `Id. ¶ 15`) to the full cite named in `parent_normalized`. Do not look them up independently — open the parent's opinion (`parent_local_path` when `parent_local_exists`, else the parent entry's `url`) and confirm the cited `pin_page`/`pin_paragraph` exists and supports the proposition. An entry with `pin_warning` is an unresolved short form — report it as a probable citation error in the brief (check whether a digit-transposed volume or a different case was intended).
+> - `cite_type: "pin_cite"` entries are short-form back-references (`491 F.3d at 363`, `Id. ¶ 15`) to the full cite named in `parent_normalized`. Do not look them up independently — open the parent's opinion (`parent_local_path` when `parent_local_exists`, else the parent entry's `url`) and confirm the cited `pin_page`/`pin_paragraph` exists and supports the proposition. A pin whose `parent_normalized` is a rule, statute, or constitutional provision (e.g. an `Id.` after `N.D.R.Civ.P. 60(b)`, or a bare `Rule 60(b)`) belongs to Agent E's authorities, not yours — skip it. An entry with `pin_warning` is an unresolved short form — report it as a probable citation error in the brief (check whether a digit-transposed volume or a different case was intended).
 >
 > ---
 >
@@ -502,7 +502,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 
 **Reads:** local markdown files from `~/refs/statute/`, `~/refs/reg/`, `~/refs/rule/`, and `~/refs/cnst/`
 
-**Input:** Pass Agent E the filtered list of statutory/regulatory/rule/constitution entries from `citations.json`. Each entry includes `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`.
+**Input:** Pass Agent E the filtered list of statutory/regulatory/rule/constitution entries from `citations.json`, plus any `pin_cite` entries whose `parent_normalized` names one of those authorities (an `Id.` after a rule or statute cite; a bare `Rule 60(b)` attributed to its rule set). Each entry includes `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`.
 
 **Prompt template:**
 
@@ -517,6 +517,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - `local_path` / `local_exists`: path in `~/refs/` and whether the file exists
 > - `url`: official source URL (ndlegis.gov, ndcourts.gov, govinfo.gov, etc.)
 > - `search_hint`: text to search for within the local file (e.g., `14-07.1-02`)
+> - `cite_type: "pin_cite"` entries are short-form back-references (an `Id.` after a rule/statute cite, or a bare `Rule 60(b)`) to the authority named in `parent_normalized`, with any subdivision in `pinpoint`. Do not look them up independently — verify the referenced subdivision and the surrounding proposition against the **parent** authority's text (`parent_local_path` when `parent_local_exists`, else the parent entry's `url`).
 >
 > **Lookup order:**
 >
