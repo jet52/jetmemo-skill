@@ -53,7 +53,8 @@ except ImportError as e:
 # ---------------------------------------------------------------------------
 
 def scan_citations(text: str, refs_dir: str = "~/refs",
-                   include_pin_cites: bool = True) -> list[dict]:
+                   include_pin_cites: bool = True,
+                   cache_missing: bool = False) -> list[dict]:
     """Scan text for all citations. Returns legacy-format dicts.
 
     Pin-cite short forms ("491 F.3d at 363", "Goss at 365", "Id. ¶ 14")
@@ -61,17 +62,64 @@ def scan_citations(text: str, refs_dir: str = "~/refs",
     cite via parent_normalized (None = unresolved — likely a drafting error).
     Pin entries never carry their own local file; verification reads the
     parent's cached opinion (parent_local_path / parent_local_exists).
+
+    If cache_missing is True, case citations without a local refs file are
+    fetched from their web source and cached to refs_dir (opinions are
+    permanent content — cached once, read locally forever after). Agent D
+    then reads local markdown instead of fetching at runtime. Pre-populated
+    refs content (NDCC, rules) is never overwritten: statutes and rules are
+    curated locally, and fetch_and_cache skips existing files. Failures are
+    logged and skipped — the entry stays web-only, same as without the flag.
     """
     refs = Path(refs_dir).expanduser()
     citations = scan_text(text, refs_dir=refs, include_pin_cites=include_pin_cites)
 
     entries = [to_legacy_dict(c, refs) for c in citations]
     add_parallel_info(entries, citations)
+
+    if cache_missing:
+        _cache_missing_cases(entries, citations, refs)
+
     mark_redundant_parallels(entries)
     annotate_pin_cites(entries)
     annotate_splice_suspects(entries, preprocess_document_text(text))
 
     return entries
+
+
+def _cache_missing_cases(entries: list[dict], citations: list, refs: Path) -> None:
+    """Fetch and cache web-only case citations (CASE_TYPES only — pins and
+    non-case authorities are skipped; see scan_citations docstring)."""
+    import time
+
+    from jetcite.cache import fetch_and_cache
+    from jetcite.legacy import CASE_TYPES
+
+    norm_to_cite = {c.normalized: c for c in citations if not c.is_pin_cite}
+    fetched_any = False
+    for entry in entries:
+        if (entry.get("cite_type") not in CASE_TYPES
+                or entry.get("local_exists")
+                or not entry.get("url")):
+            continue
+        cite = norm_to_cite.get(entry["normalized"])
+        if cite is None:
+            continue
+        if fetched_any:
+            time.sleep(0.5)  # politeness toward free public services
+        fetched_any = True
+        try:
+            cached = fetch_and_cache(cite, refs_dir=refs, timeout=15.0)
+        except Exception as exc:  # network errors must never fail the scan
+            print(f"  cache: {entry['normalized']} failed ({exc})",
+                  file=sys.stderr)
+            continue
+        if cached is not None:
+            entry["local_path"] = str(cached)
+            entry["local_exists"] = True
+        else:
+            print(f"  cache: {entry['normalized']} not available",
+                  file=sys.stderr)
 
 
 def _primary_of_pair(a: dict, b: dict) -> tuple[dict, dict]:
@@ -203,6 +251,10 @@ def main():
                         default=True,
                         help="Include pin-cite short forms linked to their "
                              "parent cites (default: on; --no-pin-cites to disable)")
+    parser.add_argument("--cache", action="store_true", default=False,
+                        help="Fetch and cache web-only case citations to the "
+                             "refs directory (opinions are permanent; cached "
+                             "once, read locally thereafter)")
     args = parser.parse_args()
 
     if args.file:
@@ -215,7 +267,8 @@ def main():
         text = sys.stdin.read()
 
     results = scan_citations(text, refs_dir=args.refs_dir,
-                             include_pin_cites=args.pin_cites)
+                             include_pin_cites=args.pin_cites,
+                             cache_missing=args.cache)
 
     if args.json:
         print(json.dumps(results, indent=2, ensure_ascii=False))

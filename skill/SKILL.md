@@ -165,8 +165,10 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 4. **Extract citation list:** Run the citation checker on all `.txt` files to build a structured citation list. This determines which conditional agents to launch.
 
    ```bash
-   cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json > citations.json
+   cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json --cache > citations.json
    ```
+
+   `--cache` fetches web-only **case** citations into `~/refs` (opinions are permanent content — cached once, read locally forever after), so Agent D reads local markdown instead of fetching at runtime, and each memo run grows the cache for the next. Pre-populated statute/rule content is never overwritten. Fetch failures are logged to stderr and the entry stays web-only — the scan never fails because a fetch did. If the network is unavailable, drop the flag.
 
    The output is a JSON array. Each entry has `cite_type`, `jurisdiction`, `local_path`, `local_exists`, `url`, and `search_hint`. Case entries also carry `antecedent_name` (the case name preceding the cite — a heuristic, may be `null`) and, for parallel citations, `parallel_cite`, `redundant_parallel`, and `primary_cite` (entries marked `redundant_parallel: true` are a parallel form of `primary_cite` — the same case). Use `cite_type` to determine which agents to launch:
    - Any `cite_type` in `neutral_cite`, `us_supreme_court`, `federal_reporter`, `regional_reporter` → launch Agent D
