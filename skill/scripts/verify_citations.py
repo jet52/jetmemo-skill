@@ -11,6 +11,7 @@ Output: structured citation data with local paths, URLs, and search hints.
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ if _BUNDLED_LIB.is_dir():
 
 try:
     from jetcite import Citation, CitationType, scan_text
+    from jetcite.cleanup import preprocess_document_text
     from jetcite.legacy import add_parallel_info, to_legacy_dict
 except ImportError as e:
     _jetcite_dir = _BUNDLED_LIB / "jetcite"
@@ -67,6 +69,7 @@ def scan_citations(text: str, refs_dir: str = "~/refs",
     add_parallel_info(entries, citations)
     mark_redundant_parallels(entries)
     annotate_pin_cites(entries)
+    annotate_splice_suspects(entries, preprocess_document_text(text))
 
     return entries
 
@@ -114,6 +117,44 @@ def mark_redundant_parallels(entries: list[dict]) -> None:
         primary, secondary = _primary_of_pair(entry, sibling)
         secondary["redundant_parallel"] = True
         secondary["primary_cite"] = primary["normalized"]
+
+
+# A short numeric token immediately after a suspect cite — the candidate
+# true opinion number when the captured one was actually page furniture.
+_NEXT_NUM_RE = re.compile(r"^\s{0,4}(\d{1,4})(?!\d)")
+_TRAILING_NUM_RE = re.compile(r"^(.*\s)(\d{1,4})$")
+
+
+def annotate_splice_suspects(entries: list[dict], text: str) -> None:
+    """Flag neutral cites that may have spliced page furniture into the
+    opinion number (the "2025 ND 13" phantom class).
+
+    jetcite strips page furniture before scanning, so surviving splices are
+    rare — but a footer that dodges the stripper can still be captured as
+    the opinion number when only a soft line break separates it from the
+    reporter. Evidence: the matched cite text spans a line break AND a bare
+    numeric token immediately follows the cite in the document (the true
+    opinion number, orphaned by the splice). Such entries get
+    ``splice_suspect: true`` and ``splice_repair_candidate`` (the cite
+    rejoined with the following token). The orchestrator must re-verify the
+    candidate before reporting the cite as nonexistent or as an unrelated
+    case.
+
+    ``text`` must be the preprocessed document text — entry positions
+    index into it.
+    """
+    for e in entries:
+        if e["cite_type"] != "neutral_cite" or "\n" not in e["cite_text"]:
+            continue
+        end = e["position"] + len(e["cite_text"])
+        nxt = _NEXT_NUM_RE.match(text[end:end + 10])
+        if nxt is None:
+            continue
+        m = _TRAILING_NUM_RE.match(e["normalized"])
+        if m is None:
+            continue
+        e["splice_suspect"] = True
+        e["splice_repair_candidate"] = f"{m.group(1)}{nxt.group(1)}"
 
 
 def annotate_pin_cites(entries: list[dict]) -> None:

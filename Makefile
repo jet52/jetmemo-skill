@@ -62,4 +62,9 @@ test: drift-check
 	@test -f install.py || (echo "FAIL: install.py missing" && exit 1)
 	@test -f README.md || (echo "FAIL: README.md missing" && exit 1)
 	@test -f VERSION || (echo "FAIL: VERSION missing" && exit 1)
+	@if [ -f test-data/check_page_break_pipeline.py ]; then \
+	  python3 test-data/check_page_break_pipeline.py; \
+	else \
+	  echo "SKIP: page-break pipeline check (test-data/ not present)"; \
+	fi
 	@echo "All checks passed."
