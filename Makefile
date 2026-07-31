@@ -6,7 +6,7 @@ JETCITE_DEST := skill/lib/jetcite
 SPLITMARKS_SRC := ../splitmarks/splitmarks.py
 SPLITMARKS_DEST := skill/scripts/splitmarks.py
 
-.PHONY: package clean install test release vendor-jetcite vendor-splitmarks drift-check
+.PHONY: package clean install test release vendor-jetcite vendor-splitmarks drift-check version-check
 
 package: clean
 	mkdir -p $(SKILL_NAME)-skill
@@ -16,7 +16,20 @@ package: clean
 	zip -r $(ZIP_NAME) $(SKILL_NAME)-skill/
 	rm -rf $(SKILL_NAME)-skill
 
-release: package
+# The version lives in three places that must agree: VERSION (canonical, drives
+# the zip name and the release tag), the plugin manifest, and the SKILL.md
+# frontmatter the model reads. v3.9.0 and v3.10.0 both shipped with only VERSION
+# bumped, leaving the other two at 3.8.5; this makes that failure loud.
+version-check:
+	@V=$$(cat VERSION) && \
+	PV=$$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .claude-plugin/plugin.json | head -1) && \
+	SV=$$(sed -n 's/^version:[[:space:]]*//p' skill/SKILL.md | head -1) && \
+	if [ "$$V" != "$$PV" ] || [ "$$V" != "$$SV" ]; then \
+	  echo "VERSION DRIFT: VERSION=$$V plugin.json=$$PV SKILL.md=$$SV"; exit 1; \
+	fi; \
+	echo "version: $$V consistent across VERSION, plugin.json, SKILL.md."
+
+release: version-check package
 	@VERSION=$$(cat VERSION) && \
 	git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
 	git push origin main && \
@@ -52,7 +65,7 @@ clean:
 install:
 	python3 install.py
 
-test: drift-check
+test: drift-check version-check
 	@echo "Validating skill structure..."
 	@test -f skill/SKILL.md || (echo "FAIL: skill/SKILL.md missing" && exit 1)
 	@test -d skill/references || (echo "FAIL: skill/references/ missing" && exit 1)
