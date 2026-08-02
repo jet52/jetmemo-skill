@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.10.1
+version: 3.11.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -115,14 +115,22 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
    ```bash
    python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v  # first pass
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v --check-text  # first pass
    ```
+
+   `--check-text` runs `pdftotext` over each output file and prints
+   `WARNING: <file> ... appears image-scanned` to stderr for anything under
+   ~50 chars/page. **Read those warnings** — they name, up front, exactly which
+   record items need the visual read the Essential-Documents Rule requires
+   below, instead of an agent discovering it after loading the file and getting
+   nothing. The flag needs `pdftotext` on `PATH`; without poppler it degrades
+   to "can't check," so its silence is not proof of a text layer.
 
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 
    ```bash
    python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v  # split again
+   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v --check-text  # split again
    ```
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
@@ -131,7 +139,7 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    - Identify the order's/judgment's **record number and date** from the notice of appeal and the briefs' record citations (e.g., "R38").
    - **Read the record index** (usually the first record item) to map that record number to its page range in the combined batch.
    - Split with `splitmarks` to isolate it; if the batch has no bookmarks, target that specific page range.
-   - **If the item is image-scanned and text extraction is thin, perform a visual read** (Read tool on the PDF pages directly) — this is mandatory, not "if time permits." Mark it `needs_visual_read` and ensure an agent actually reads it.
+   - **If the item is image-scanned and text extraction is thin, perform a visual read** (Read tool on the PDF pages directly) — this is mandatory, not "if time permits." Mark it `needs_visual_read` and ensure an agent actually reads it. `splitmarks --check-text` (above) names these files at split time; treat each warning as a `needs_visual_read` candidate rather than waiting to discover it downstream.
 
 4. If **no PDFs** found, ask the user. If many files or ambiguous, confirm with the user.
 
