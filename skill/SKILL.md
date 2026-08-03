@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.11.0
+version: 3.13.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -19,9 +19,12 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | Court Rules            | `~/refs/rule/{set}/`                                          |
 | Constitutions          | `~/refs/cnst/ND/`, `~/refs/cnst/US/`                          |
 | Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
+| ND citation style      | `~/.claude/skills/jetmemo/references/nd-citation-style.md` |
 | Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
 | Citation checker       | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
 | splitmarks             | `~/.claude/skills/jetmemo/scripts/splitmarks.py`       |
+| Model-comparison spec  | `~/.claude/skills/jetmemo/references/model-comparison.md` |
+| Comparison metrics     | `~/.claude/skills/jetmemo/scripts/compare_agents.py`   |
 
 > **Dependencies:**
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
@@ -145,13 +148,16 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
 5. **Build a manifest:** `{path, type, page_count, essential, read_status}` for every document. Track this manifest for all subsequent steps. Set `essential: true` for every order and judgment on appeal (and add other documents to the essential set in Step 2.5 once the key-documents list exists). Initialize `read_status: unread`; an agent flips it to `read` only after it has actually read the document's text (or visually read its pages). The Step 2.5 gate checks this field.
 
-6. **Strength assessment mode:** Default `strength_mode: true`. Scan the user's request for suppression keywords: "neutral", "no assessment", "both sides only", "without assessment", or "no strength assessment." If found, set `strength_mode: false`. **Do not ask the user which mode they want.** When the request contains no suppression keyword, proceed directly with the strength assessment without prompting. When `strength_mode` is enabled, the memo assesses, for each issue, which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — stated with appropriate qualifications, hedging, and an explicit confidence level (high / moderate / low), and **never** as a recommended disposition. When suppressed, the memo presents both sides' strongest positions without assessing which is stronger. In either mode, if there are close questions the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
+6. **Subagent comparison mode (test feature, default OFF).** Scan the user's request for one of: "subagent comparison test", "model comparison test", "compare subagents", "model bakeoff", "run comparison test". If **and only if** one is present, set `comparison_mode: true` and read `~/.claude/skills/jetmemo/references/model-comparison.md` — it governs how Phase 2 and Step 3.6 dispatch. Otherwise set `comparison_mode: false`, do not read that file, and run the normal pipeline. Never offer or infer this mode; it triples Phase 2 cost and is for skill development, not memo production.
+
+7. **Strength assessment mode:** Default `strength_mode: true`. Scan the user's request for suppression keywords: "neutral", "no assessment", "both sides only", "without assessment", or "no strength assessment." If found, set `strength_mode: false`. **Do not ask the user which mode they want.** When the request contains no suppression keyword, proceed directly with the strength assessment without prompting. When `strength_mode` is enabled, the memo assesses, for each issue, which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — stated with appropriate qualifications, hedging, and an explicit confidence level (high / moderate / low), and **never** as a recommended disposition. When suppressed, the memo presents both sides' strongest positions without assessing which is stronger. In either mode, if there are close questions the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
 ### Step 1: Read References and Extract Text
 
 1. **Read references** into main context (small files, needed for synthesis):
    - `~/.claude/skills/jetmemo/references/style-spec.md`
    - `~/.claude/skills/jetmemo/references/memo-format.md`
+   - `~/.claude/skills/jetmemo/references/nd-citation-style.md` — the ND Supreme Court's Redbook supplement; governs every ND case, statute, and session-law citation the memo writes
 
 2. **Extract text** from all PDFs using the smart extraction script, which tries multiple PDF libraries in priority order and picks the best result:
 
@@ -218,6 +224,12 @@ A local `~/refs/` opinion file, when present, is equally authoritative and insta
 ---
 
 ## Phase 2: Parallel Analysis (Subagents)
+
+> **If `comparison_mode` is on** (Step 0, item 6 — rare), do not use the simultaneous
+> dispatch below. Follow `references/model-comparison.md` instead: each slot is
+> dispatched to three arms paired-parallel, slot by slot, and the Opus arm's output
+> is the one the memo is built from. Everything else in Phase 2 and Step 3.6 is
+> unchanged.
 
 Launch all applicable agents **simultaneously** using the Task tool (`subagent_type: general-purpose`). Each agent gets:
 

@@ -5,8 +5,10 @@ JETCITE_SRC := ../jetcite/src/jetcite
 JETCITE_DEST := skill/lib/jetcite
 SPLITMARKS_SRC := ../splitmarks/splitmarks.py
 SPLITMARKS_DEST := skill/scripts/splitmarks.py
+CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
+CITESTYLE_DEST := skill/references/nd-citation-style.md
 
-.PHONY: package clean install test release vendor-jetcite vendor-splitmarks drift-check version-check
+.PHONY: package clean install test release vendor-jetcite vendor-splitmarks vendor-citestyle drift-check version-check
 
 package: clean
 	mkdir -p $(SKILL_NAME)-skill
@@ -49,6 +51,13 @@ vendor-splitmarks:
 	cp $(SPLITMARKS_SRC) $(SPLITMARKS_DEST)
 	@echo "Vendored splitmarks from $(SPLITMARKS_SRC)"
 
+# The ND Supreme Court's Redbook supplement. Canonical copy lives in the jetcite
+# repo so jetmemo, jetredline, and jetrehearing cite one identical rule set.
+vendor-citestyle:
+	@test -f $(CITESTYLE_SRC) || (echo "FAIL: citation-style source not found at $(CITESTYLE_SRC)" && exit 1)
+	cp $(CITESTYLE_SRC) $(CITESTYLE_DEST)
+	@echo "Vendored nd-citation-style.md from $(CITESTYLE_SRC)"
+
 # Fail if a vendored copy has drifted from its canonical source repo.
 # Tolerant of canonical being absent (e.g. on an install-only machine).
 drift-check:
@@ -57,6 +66,12 @@ drift-check:
 	  echo "splitmarks: in sync with canonical."; \
 	else \
 	  echo "splitmarks: canonical repo not present ($(SPLITMARKS_SRC)); skipping drift check."; \
+	fi
+	@if [ -f $(CITESTYLE_SRC) ]; then \
+	  cmp -s $(CITESTYLE_SRC) $(CITESTYLE_DEST) || { echo "DRIFT: $(CITESTYLE_DEST) differs from canonical $(CITESTYLE_SRC) — run 'make vendor-citestyle'"; exit 1; }; \
+	  echo "nd-citation-style: in sync with canonical."; \
+	else \
+	  echo "nd-citation-style: canonical repo not present ($(CITESTYLE_SRC)); skipping drift check."; \
 	fi
 
 clean:

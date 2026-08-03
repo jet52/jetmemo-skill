@@ -13,18 +13,24 @@ A North Dakota rule always overrides a conflicting Bluebook or Redbook conventio
 
 ## Citation Formats
 
-### ND Supreme Court Cases
-```
-2024 ND 156
-2024 ND 156, ¶ 12
-```
-Always include pinpoint paragraph when citing a specific proposition.
+### ND cases — see `nd-citation-style.md`
 
-### Reporter Citations
-```
-876 N.W.2d 234
-```
-Include when available alongside ND citation: `Case Name, 2024 ND 156, ¶ 12, 876 N.W.2d 234`
+**The Court's own Redbook supplement governs every North Dakota case citation**
+and is a separate file in this directory: `nd-citation-style.md`. Read it before
+drafting or checking a ND cite. It controls, among other things:
+
+- which form applies by era (1997–present public-domain; 1954–1997 and
+  1890–1953 reporter-only, omitting N.D. Reports);
+- `ND` vs `ND App` (the Court of Appeals — a distinct court sharing a
+  year/number space with the Supreme Court);
+- that a full public-domain cite carries the N.W. parallel to its **first page
+  only**, with no pin cite to the reporter;
+- short forms, `Id. at ¶ N`, and the special same-paragraph short form
+  (`Kuntz, at ¶ 11`);
+- N.D.C.C., N.D.R.C., and session-law forms.
+
+Do not restate those rules here — this file would drift from the canonical copy.
+`nd-citation-style.md` is vendored from the jetcite repo; edit it there.
 
 ### Federal Cases
 ```

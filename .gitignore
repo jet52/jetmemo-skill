@@ -10,6 +10,10 @@ PLAN.md
 TODO.md
 .claude/
 
+# Subagent-comparison output. references/model-comparison.md writes raw memo
+# drafts keyed by real case number here; this repo is public.
+.model-comparison/
+
 # Python build/test/lint artifacts (covers the vendored skill/lib/jetcite copy,
 # whose upstream .gitignore does not carry over)
 *.egg-info/
