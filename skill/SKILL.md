@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.13.0
+version: 3.13.1
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -10,21 +10,23 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 
 ## Fixed Paths
 
+`${CLAUDE_SKILL_DIR}` below is replaced by the harness with this skill's absolute directory (standalone install, plugin cache, or Cowork mount alike) before you read this file — the paths you see are literal. Keep them double-quoted in shell commands; on Windows the path may contain spaces.
+
 | Resource               | Path                                                      |
 | ---------------------- | --------------------------------------------------------- |
-| This skill             | `~/.claude/skills/jetmemo/`                            |
+| This skill             | `${CLAUDE_SKILL_DIR}/`                            |
 | Opinions               | `~/refs/opin/{reporter}/`                                     |
 | Statutes               | `~/refs/statute/NDCC/`, `~/refs/statute/USC/`                 |
 | Regulations            | `~/refs/reg/NDAC/`, `~/refs/reg/CFR/`                         |
 | Court Rules            | `~/refs/rule/{set}/`                                          |
 | Constitutions          | `~/refs/cnst/ND/`, `~/refs/cnst/US/`                          |
-| Style reference        | `~/.claude/skills/jetmemo/references/style-spec.md`    |
-| ND citation style      | `~/.claude/skills/jetmemo/references/nd-citation-style.md` |
-| Memo format reference  | `~/.claude/skills/jetmemo/references/memo-format.md`   |
-| Citation checker       | `~/.claude/skills/jetmemo/scripts/verify_citations.py` |
-| splitmarks             | `~/.claude/skills/jetmemo/scripts/splitmarks.py`       |
-| Model-comparison spec  | `~/.claude/skills/jetmemo/references/model-comparison.md` |
-| Comparison metrics     | `~/.claude/skills/jetmemo/scripts/compare_agents.py`   |
+| Style reference        | `${CLAUDE_SKILL_DIR}/references/style-spec.md`    |
+| ND citation style      | `${CLAUDE_SKILL_DIR}/references/nd-citation-style.md` |
+| Memo format reference  | `${CLAUDE_SKILL_DIR}/references/memo-format.md`   |
+| Citation checker       | `${CLAUDE_SKILL_DIR}/scripts/verify_citations.py` |
+| splitmarks             | `${CLAUDE_SKILL_DIR}/scripts/splitmarks.py`       |
+| Model-comparison spec  | `${CLAUDE_SKILL_DIR}/references/model-comparison.md` |
+| Comparison metrics     | `${CLAUDE_SKILL_DIR}/scripts/compare_agents.py`   |
 
 > **Dependencies:**
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
@@ -87,9 +89,9 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
 ### Step 0: Scan, Classify, and Split
 
-**Refs setup:** Run `python3 ~/.claude/skills/jetmemo/scripts/ensure_refs.py`. If it prints output, include it as a note to the user. This is a no-op when `~/refs` already exists (e.g., in Claude Code); in Cowork it detects a mounted `refs` folder and symlinks `~/refs` to it.
+**Refs setup:** Run `python3 "${CLAUDE_SKILL_DIR}/scripts/ensure_refs.py"`. If it prints output, include it as a note to the user. This is a no-op when `~/refs` already exists (e.g., in Claude Code); in Cowork it detects a mounted `refs` folder and symlinks `~/refs` to it.
 
-**Update check:** Run `python3 ~/.claude/skills/jetmemo/scripts/check_update.py` silently. If it prints output, include it as a note to the user.
+**Update check:** Run `python3 "${CLAUDE_SKILL_DIR}/scripts/check_update.py"` silently. If it prints output, include it as a note to the user.
 
 1. **Scan** the working directory for `.pdf` files.
 
@@ -117,8 +119,8 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf --dry-run -vv   # preview bookmark tree
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py record.pdf -o .split_records --no-clobber -v --check-text  # first pass
+   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf --dry-run -vv   # preview bookmark tree
+   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf -o .split_records --no-clobber -v --check-text  # first pass
    ```
 
    `--check-text` runs `pdftotext` over each output file and prints
@@ -132,8 +134,8 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 
    ```bash
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
-   python ~/.claude/skills/jetmemo/scripts/splitmarks.py .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v --check-text  # split again
+   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
+   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v --check-text  # split again
    ```
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
@@ -148,21 +150,21 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 
 5. **Build a manifest:** `{path, type, page_count, essential, read_status}` for every document. Track this manifest for all subsequent steps. Set `essential: true` for every order and judgment on appeal (and add other documents to the essential set in Step 2.5 once the key-documents list exists). Initialize `read_status: unread`; an agent flips it to `read` only after it has actually read the document's text (or visually read its pages). The Step 2.5 gate checks this field.
 
-6. **Subagent comparison mode (test feature, default OFF).** Scan the user's request for one of: "subagent comparison test", "model comparison test", "compare subagents", "model bakeoff", "run comparison test". If **and only if** one is present, set `comparison_mode: true` and read `~/.claude/skills/jetmemo/references/model-comparison.md` — it governs how Phase 2 and Step 3.6 dispatch. Otherwise set `comparison_mode: false`, do not read that file, and run the normal pipeline. Never offer or infer this mode; it triples Phase 2 cost and is for skill development, not memo production.
+6. **Subagent comparison mode (test feature, default OFF).** Scan the user's request for one of: "subagent comparison test", "model comparison test", "compare subagents", "model bakeoff", "run comparison test". If **and only if** one is present, set `comparison_mode: true` and read `${CLAUDE_SKILL_DIR}/references/model-comparison.md` — it governs how Phase 2 and Step 3.6 dispatch. Otherwise set `comparison_mode: false`, do not read that file, and run the normal pipeline. Never offer or infer this mode; it triples Phase 2 cost and is for skill development, not memo production.
 
 7. **Strength assessment mode:** Default `strength_mode: true`. Scan the user's request for suppression keywords: "neutral", "no assessment", "both sides only", "without assessment", or "no strength assessment." If found, set `strength_mode: false`. **Do not ask the user which mode they want.** When the request contains no suppression keyword, proceed directly with the strength assessment without prompting. When `strength_mode` is enabled, the memo assesses, for each issue, which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — stated with appropriate qualifications, hedging, and an explicit confidence level (high / moderate / low), and **never** as a recommended disposition. When suppressed, the memo presents both sides' strongest positions without assessing which is stronger. In either mode, if there are close questions the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
 
 ### Step 1: Read References and Extract Text
 
 1. **Read references** into main context (small files, needed for synthesis):
-   - `~/.claude/skills/jetmemo/references/style-spec.md`
-   - `~/.claude/skills/jetmemo/references/memo-format.md`
-   - `~/.claude/skills/jetmemo/references/nd-citation-style.md` — the ND Supreme Court's Redbook supplement; governs every ND case, statute, and session-law citation the memo writes
+   - `${CLAUDE_SKILL_DIR}/references/style-spec.md`
+   - `${CLAUDE_SKILL_DIR}/references/memo-format.md`
+   - `${CLAUDE_SKILL_DIR}/references/nd-citation-style.md` — the ND Supreme Court's Redbook supplement; governs every ND case, statute, and session-law citation the memo writes
 
 2. **Extract text** from all PDFs using the smart extraction script, which tries multiple PDF libraries in priority order and picks the best result:
 
    ```bash
-   python3 ~/.claude/skills/jetmemo/scripts/extract_text.py <file1>.pdf <file2>.pdf ...
+   python3 "${CLAUDE_SKILL_DIR}/scripts/extract_text.py" <file1>.pdf <file2>.pdf ...
    ```
 
    The script tries extractors in this order: `pdftotext` (Poppler) → `pypdf` → `PyMuPDF` → `pdfplumber` → `marker`. Each page is scored individually. It stops as soon as one extractor produces good output (≥ 70% of text-bearing pages score ≥ 5 words/line). If only marginal output is found, it uses the best available. The script writes two files per PDF:
@@ -179,7 +181,7 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
 4. **Extract citation list:** Run the citation checker on all `.txt` files to build a structured citation list. This determines which conditional agents to launch.
 
    ```bash
-   cat *.txt | python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --refs-dir ~/refs --json --cache > citations.json
+   cat *.txt | python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --refs-dir ~/refs --json --cache > citations.json
    ```
 
    `--cache` fetches web-only **case** citations into `~/refs` (opinions are permanent content — cached once, read locally forever after), so Agent D reads local markdown instead of fetching at runtime, and each memo run grows the cache for the next. Pre-populated statute/rule content is never overwritten. Fetch failures are logged to stderr and the entry stays web-only — the scan never fails because a fetch did. If the network is unavailable, drop the flag.
@@ -851,7 +853,7 @@ Hyperlink citations to authority in the memo markdown. This converts bare citati
 
 ```bash
 # Generate memo-derived citation list
-python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} --refs-dir ~/refs --json > memo_citations.json
+python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs --json > memo_citations.json
 
 # Merge brief + memo citations (de-dup by cite_text, prefer entries with URLs)
 python3 -c "
@@ -868,7 +870,7 @@ json.dump(list(merged.values()), open('merged_citations.json','w'), indent=2)
 "
 
 # Link with the enriched set
-python3 ~/.claude/skills/jetmemo/scripts/link_citations.py {memo_file} merged_citations.json
+python3 "${CLAUDE_SKILL_DIR}/scripts/link_citations.py" {memo_file} merged_citations.json
 ```
 
 `link_citations.py` (version ≥ 2) automatically derives short-form aliases:
@@ -884,7 +886,7 @@ Citations already inside markdown links are left untouched. If `citations.json` 
 Convert the markdown memo to a formatted .docx file matching the Court's bench memo template (QTPalatine 13pt, justified, 1.2 line spacing):
 
 ```bash
-python3 ~/.claude/skills/jetmemo/scripts/memo_to_docx.py {memo_file}
+python3 "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
 ```
 
 This produces `{case_number}_memo.docx` alongside the markdown file. The docx uses the same styles as the Court's bench memos: Title, Address Block (with tab-aligned metadata), Heading 1 (centered section heads), Heading 2 (issue headings), Heading 3 (sub-arguments), and Main Body Text. Page numbers appear in the footer.
@@ -902,7 +904,7 @@ To decide which case you are in, diff the memo's citations against the brief-der
 Run the citation checker on the finished memo:
 
 ```bash
-python3 ~/.claude/skills/jetmemo/scripts/verify_citations.py --file {memo_file} --refs-dir ~/refs
+python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs
 ```
 
 The human-readable output shows total citations found, how many resolve locally vs. web-only vs. unresolved, grouped by type.
@@ -935,9 +937,9 @@ The script's own local/web-only/unresolved counts describe URL *resolution* and 
 Stamp a provenance footer onto the finished memo so the report carries a reproducibility record — which Claude model and which jetmemo version generated it, and on what date — for later validation and comparison as the model and the skill change over time. Run this **last**, after any Step 9 verification append, then regenerate the `.docx` so the footer appears in both files:
 
 ```bash
-python3 ~/.claude/skills/jetmemo/scripts/provenance.py --file {memo_file} \
+python3 "${CLAUDE_SKILL_DIR}/scripts/provenance.py" --file {memo_file} \
   --model "{runtime model — friendly name and exact ID, e.g. Claude Opus 4.8 (claude-opus-4-8)}"
-python3 ~/.claude/skills/jetmemo/scripts/memo_to_docx.py {memo_file}
+python3 "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
 ```
 
 The footer reads, e.g.: *Report generated by Claude Opus 4.8 (claude-opus-4-8) using jetmemo v3.7.0 on 2026-06-05. AI-generated first draft for internal use; verify all citations and findings before relying.*

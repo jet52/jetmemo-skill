@@ -225,9 +225,12 @@ found more pleasant to read is not. Weight the report accordingly.
 After all slots finish, run:
 
 ```bash
-python3 ~/.claude/skills/jetmemo/scripts/compare_agents.py \
+python3 "<SKILL_DIR>/scripts/compare_agents.py" \
   --out .model-comparison/{case_number}/metrics.md
 ```
+
+(`<SKILL_DIR>` is the skill directory you already know from SKILL.md's Fixed
+Paths table — this file is read verbatim, so substitute it yourself.)
 
 It reads the session transcript, pairs runs by the `cmp <slot> <arm>` tag, and
 reports per-arm duration, total tokens, output tokens, cache reads, tool-call
