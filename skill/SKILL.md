@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.13.2
+version: 3.14.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -73,15 +73,23 @@ Some documents must be **read in full** before any analysis, regardless of lengt
 
 1. **Every order and judgment on appeal** — the dispositions under review. These are short and dispositive; there is never an excuse to work from the briefs' description of them.
 2. **Every document on the memo's Quick Reference / key-documents and highly-relevant lists.** If a document is important enough to list for the justices, it is important enough to have been read.
-3. The **relevant portions** of large supporting items (full transcript, full record) — read in part, but read; never assume their contents.
+3. **Every district court party filing that bears on a contested issue's preservation** — the application, answer, motions, responses, closing briefs, proposed findings, proposed jury instructions, and the like. Preservation is a fact about the record, not about the briefs; it cannot be established or refuted from the appellate briefs alone. Step 2.6 is the mechanism.
+4. The **relevant portions** of large supporting items (full transcript, full record) — read in part, but read; never assume their contents.
 
 Token efficiency exists to make *thorough* reading affordable. Splitting, text extraction, and parallel agents are tools for reading the whole essential set cheaply — **never** a license to skip it. When efficiency and thoroughness conflict over an essential document, **thoroughness wins, every time.**
 
 - **Never infer** the contents, reasoning, or grounds of an order, judgment, or key document from the parties' briefs. The briefs are advocacy; the order is the ruling.
 - **Hedging is a symptom, not a style.** If you are about to write "the district court *appears to* have," "*seems to* have," or "*evidently*" about the lower court's reasoning, stop — that phrasing means you have not read the order. Read it, then state what it actually says with a pinpoint cite.
+- **Watch for subject substitution — the same failure wearing a confident face.** "The brief identifies no motion for an evaluation," "the appellant does not cite where this was raised," "the brief is silent on preservation." These read as findings but their *subject is the brief*, where the reader needs a claim about *the record*. They can be literally true and materially false — the motion may sit in the record, uncited. Whenever the reader needs a record fact, make the record the subject of the sentence, or say plainly that the filings were not searched. A phrase list will not catch every form of this; the test is what the sentence is *about*.
+- **The negative-proof rule.** A memo may not characterize an issue as unpreserved, waived, or first raised on appeal except in one of these three forms:
+  1. **Searched and absent** — the district court filings and transcript were searched and the argument is not there. Say where you looked.
+  2. **Record incomplete** — the filings that would show preservation are not in the record on appeal. Say which are missing.
+  3. **Preserved** — cite the filing or transcript page where it was raised.
+  
+  A brief page is never a sufficient source for any of the three. **The appellant bears the burden** of establishing that an issue was preserved and of providing a record adequate to show it, so forms 1 and 2 may both be resolved against the appellant — but only *after* the search, and the memo must say the search happened and what it covered. Support any burden statement in the memo with authority verified through the normal citation pipeline; do not assert it bare.
 - **A missing essential document is a blocking condition, not a workaround.** If an order or judgment cannot be located in the provided materials, ask the user — do not proceed on inference. If a key document genuinely is not in what was provided, say so explicitly in the memo; never paper over the gap.
 
-This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
+This rule governs the entire pipeline below; Steps 0, 2.5, 2.6, and 5 enforce it.
 
 ---
 
@@ -104,6 +112,8 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    | `reply-brief`      | "Reply Brief"                                                       |
    | `notice-of-appeal` | "Notice of Appeal"                                                  |
    | `order`            | District court order, judgment, findings                            |
+   | `dc-filing`        | A **party** filing in the district court: application, petition, answer, motion, response, reply, closing/post-hearing brief, proposed findings, proposed jury instructions, offer of proof. These are where preservation lives — never leave them in `other` |
+   | `record-index`     | Register of actions, index of record, docket sheet — the enumeration of what was filed below and when |
    | `transcript`       | Hearing or trial transcript                                         |
    | `writ-petition`    | "Petition for Supervisory Writ", "Application for Writ", "Petition for Writ of Habeas Corpus" |
    | `writ-response`    | "Response to Petition", response filed by opposing party in writ proceeding |
@@ -145,6 +155,8 @@ This rule governs the entire pipeline below; Steps 0, 2.5, and 5 enforce it.
    - **Read the record index** (usually the first record item) to map that record number to its page range in the combined batch.
    - Split with `splitmarks` to isolate it; if the batch has no bookmarks, target that specific page range.
    - **If the item is image-scanned and text extraction is thin, perform a visual read** (Read tool on the PDF pages directly) — this is mandatory, not "if time permits." Mark it `needs_visual_read` and ensure an agent actually reads it. `splitmarks --check-text` (above) names these files at split time; treat each warning as a `needs_visual_read` candidate rather than waiting to discover it downstream.
+
+   **Enumerate the district court party filings from the record index.** The same record index used above to map record numbers is the only reliable inventory of what was filed below. Read it and list every `dc-filing` — application/petition, answer, motions, responses, closing or post-hearing briefs, proposed findings, proposed jury instructions — with its record number and date. Record this list in the manifest even for filings you do not yet expect to need. Step 2.6 traces preservation against it, and a filing that never entered the manifest can never be searched. If no record index is present, note that in the manifest: it means the filing inventory is incomplete and Step 2.6's search is bounded by whatever happens to be in the working directory.
 
 4. If **no PDFs** found, ask the user. If many files or ambiguous, confirm with the user.
 
@@ -295,8 +307,12 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 > - What interpretation the appellant/petitioner advocates
 > - Pinpoint cite to brief page where the argument appears
 >
-> **7. Preservation Flags**
-> For each issue, note whether the brief identifies where the argument was raised below (objection, motion, etc.) with record citation. If the brief is silent on preservation, flag it.
+> **7. Preservation Assertions (brief-derived — not findings)**
+> For each issue, report **what the brief asserts** about preservation, labeled as the brief's assertion rather than as a fact about the record:
+> - The record citation the brief gives for where the argument was raised below (objection, motion, filing, hearing colloquy) — or **"brief gives none."**
+> - Any express preservation argument the brief makes (e.g., that plain-error review applies, or that the issue was preserved by a specific filing).
+>
+> **Do not conclude that an issue was unpreserved.** The absence of a record citation in a brief is evidence about the brief, not about the record — the filing may exist and simply be uncited. Write "brief gives no record citation for where this was raised," never "this was not raised below." A later step searches the district court filings and makes that finding from the record.
 >
 > **Citation precision:** For every factual assertion, provide the record cite with pinpoint page (R##:page) and a short quote (≤ 15 words) identifying the relevant passage.
 >
@@ -421,6 +437,11 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > - Key testimony (witness, topic, substance) for each witness
 > - Preservation of error: objections made or not made, judge's rulings on objections
+> - **Legal-argument index** — a locator table, **not** a summary. Arguments are preserved orally as often as in writing, and one made at hearing and never reduced to writing is invisible to anyone reading only the filings; this index is how a later step finds them without re-reading the transcript.
+>   - **Skip this entirely if the transcript is under ~50 pages** — say "short transcript, no index needed" and move on. A later step will simply read it.
+>   - Otherwise, list each **locus where law was argued rather than facts developed**: motion hearings, motions in limine, Rule 29/50 motions, sidebar or bench argument on an objection, jury-instruction conferences, offers of proof, argument on the law in closing, post-trial motion argument.
+>   - One row per locus: **page range | who argued | a subject tag of ten words or fewer**. Do not summarize the argument, do not record what was decided, and do not assess whether it preserved anything. A tag like "competency evaluation under 29-32.1-01(3)(b)" is the whole job.
+>   - If argument is scattered through witness examination rather than confined to discrete loci, **say so** — it means the index is a guide, not an inventory, and the later reader should search beyond it.
 > - Colloquy relevant to issues on appeal
 > - Any admissions or concessions by either party
 >
@@ -593,9 +614,9 @@ Collect results from all agents. Then:
 
 2. **Exhibit Cross-Reference:** Merge lists of key evidence from Agents A and B. For each exhibit or record item, show what each side claims it proves. Flag exhibits cited by only one side.
 
-3. **Preservation & Waiver:** For each issue, combine Agent A's preservation flags with Agent B's waiver arguments. Assess whether preservation appears adequate based on the record citations provided.
+3. **Preservation & Waiver — what the parties assert (no assessment here):** For each issue, tabulate three columns: the record citation the appellant's brief gives for preservation (or "none given"), the appellee's waiver or non-preservation argument (or "none"), and whether the two conflict. **Do not assess adequacy at this step.** Every entry is brief-derived and provisional; Step 2.6 searches the district court filings and supplies the finding. Label the table as such so a downstream reader cannot mistake it for a record-based conclusion.
 
-4. **First-Raised-on-Appeal:** Flag any argument that appears to lack a record citation for where it was raised below, or that the appellee claims was not preserved.
+4. **Preservation questions to trace:** From the table, list every issue needing a record trace in Step 2.6 — which, per Step 2.6, is **every issue on appeal**, with these flagged as the highest-yield: an issue where the appellant gives no record citation, and an issue where the appellee affirmatively argues non-preservation. Flagging is for prioritization within the trace, not for narrowing it. **Do not write "first raised on appeal" or "unpreserved" anywhere at this step** — no document read so far can support that finding.
 
 5. **Reply-Only Arguments:** From Agent C1, list arguments that appear in the reply but not in the opening brief. These may be improper new arguments — flag them.
 
@@ -606,10 +627,15 @@ Collect results from all agents. Then:
 **GATE: Do not begin legal framing or memo generation until every essential document has been read.** This closes the Essential-Documents Rule with a hard check.
 
 1. **Assemble the essential set:** the union of
-   - every order and judgment on appeal (manifest `essential: true`), and
-   - every document on Agent A's **Key Documents for Quick Reference** list, plus any document an agent flagged as highly relevant to an issue.
+   - every order and judgment on appeal (manifest `essential: true`),
+   - every document on Agent A's **Key Documents for Quick Reference** list, plus any document an agent flagged as highly relevant to an issue, and
+   - every `dc-filing` bearing on any issue's preservation.
    
    Mark each of these `essential: true` in the manifest if not already.
+
+   **Derive the `dc-filing` set from the record index and the master issue list — never from Agent A's citations.** The Quick Reference list comes from the appellant's brief, so a brief that fails to cite its own closing argument would keep that document out of the essential set: exactly the filing whose absence the memo would then wrongly report. Work the other direction. For each issue on the master issue list, ask which filings *could* have raised it — the operative pleading, any dispositive motion and response, post-hearing or closing briefs, proposed findings, proposed instructions — and mark those essential whether or not any brief cites them. When in doubt, include; these filings are short relative to the briefs.
+
+   **Division of labor with Step 2.6:** this step **locates, manifests, splits, and extracts** the `dc-filing` set — including any visual read a scanned filing needs. Step 2.6 is what **reads** them for preservation. Do not treat that as a circular gate: the requirement here is that each filing be retrievable and machine-readable, not yet analyzed.
 
 2. **Confirm each was actually read.** A document counts as read only if its text (or a visual read of its pages) is present in an agent's returned analysis — not merely named, and not characterized from a brief's description of it.
 
@@ -618,8 +644,72 @@ Collect results from all agents. Then:
 4. **Handle genuine absence:**
    - If an **order or judgment** cannot be located in the provided materials, **stop and ask the user** for it — do not proceed on inference.
    - If a **key/highly-relevant document** is genuinely not in what was provided, note this explicitly (it will be flagged in the memo and to the user) and proceed; never substitute a brief's characterization for the missing document.
+   - If **no `dc-filing` is in the manifest at all** — a briefs-only run — do not block. Set `preservation_trace: unavailable`, tell the user which filings would be needed and offer to accept them, and proceed. Step 2.6 degrades per its own rules, and the memo discloses the limit. Do not silently report the brief-derived version.
 
-Only when the essential set is fully read (or its absence explicitly flagged) may you continue to Step 3.
+Only when the essential set is fully read (or its absence explicitly flagged) may you continue to Step 2.6.
+
+### Step 2.6: Preservation Trace (Agent G — synthesis subagent)
+
+Preservation is a fact about the district court record. Nothing read before this step can establish it: Agents A and B read advocacy, Agent C2 reads the order (which shows what the court *ruled on*, not everything that was *raised*), and Agent C3 reads a hearing that may not be where the issue was joined. This step is where the record is actually searched.
+
+It runs **here — after the Step 2.5 read gate, before Step 3 framing** — because Step 3 analyzes preservation before reaching the merits and lowers its confidence where preservation is doubtful. A trace that ran later would arrive after the framing it exists to inform. (Contrast Agent F at Step 3.6, which supplements framing that has already happened.)
+
+**Scope: every issue on the master issue list.** Not just the contested ones. Contest is itself a brief-derived signal, and narrowing by it rebuilds the closed circuit this step exists to break. The filings are read once regardless; the marginal cost is tracing, not reading.
+
+**Launch condition:** at least one `dc-filing` or transcript in the manifest. If none, skip and set `preservation_trace: unavailable` (see Degradation).
+
+**Reads:** the `dc-filing` set marked essential in Step 2.5, the record index, and the transcript — the latter bounded by Agent C3's **legal-argument index**, which names the page ranges where law was argued. Agent G reads those ranges, not the whole transcript. Two exceptions: if C3 reported a short transcript with no index, G reads it entire; if C3 reported that argument is scattered through witness examination, the index is a starting point and G searches beyond it. The division is deliberate — C3 locates, G reads. Neither reads the whole transcript for the other's purpose.
+
+**How to invoke:** one subagent (Task tool, `subagent_type: general-purpose`), `description: "Preservation trace"`. Block on it (`TaskOutput` with `block: true`) before Step 3. If it fails or times out, do the trace in main context rather than skipping it — the filings are short relative to the briefs, and a skipped trace reintroduces the defect. Only a genuine absence of filings produces `preservation_trace: unavailable`.
+
+**Prompt template:**
+
+> **Preservation Trace**
+>
+> You are searching the district court record to establish, as a matter of record fact, where each issue on appeal was raised below. The appellate briefs are **not** evidence of this and are not provided for that purpose. Search the filings.
+>
+> **Files:**
+> - District court party filings: `[paths]`
+> - Record index / register of actions: `[path]`
+> - Transcript: `[path]`
+> - Transcript legal-argument index (page ranges where law was argued): `[Agent C3's index — or "short transcript, read it entire," or "argument scattered; index is a guide only"]`
+> - Objections and rulings already extracted: `[Agent C3 output]`
+>
+> **Issues to trace:** [the full master issue list from Step 2, verbatim]
+>
+> **Part 1 — Forward trace. For each issue, report:**
+>
+> - **Where raised below** — the filing or transcript page, with a pinpoint cite (R##:page or transcript page) and a short quote (≤ 25 words) of the language that raised it. Look in *all* of: the operative pleading or application, dispositive motions and responses, closing or post-hearing briefs, proposed findings, proposed jury instructions, offers of proof, and oral argument at hearing. An issue may be preserved by any of these; do not stop at the first place you would expect to find it.
+>
+>   For the transcript, **read the page ranges the legal-argument index names** — that index is a locator, so it carries subject tags but not substance; you supply the substance by reading the pages. If the index says the transcript is short, read it entire. If it says argument is scattered through witness examination, treat the index as a starting point and search further.
+> - **Relief requested** — what the party actually asked the court to do.
+> - **Whether the court ruled on it** — and if so, where.
+> - **Verdict**, exactly one of:
+>   - `PRESERVED` — found, with the pinpoint above.
+>   - `SEARCHED-NOT-FOUND` — you read the filings and transcript pages listed and the argument is not in them. **List what you searched — filings by record number, transcript by page range.** This verdict is only available if you actually read them.
+>   - `RECORD-INCOMPLETE` — the filings that would show it are not in the materials provided. Name what is missing (from the record index, if present).
+>
+> There is no fourth option and no "unclear." If you cannot reach one of these three, say which filings you would need.
+>
+> **Part 2 — Reverse trace (equally important). Independently of the issue list**, report every legal argument, claim, statute, rule, or case that was **raised below and does not appear on appeal**. Give the pinpoint where it was raised and one line on what it was. Scope this to the **filings** plus the transcript pages you read for Part 1 — do not read the rest of the transcript hunting for more. The filings are where a dropped theory is most visible, and a bounded reverse trace that reports what it covered beats an unbounded one that never finishes. This tells the Court what is *not* before it, and a party's shift in theory between the district court and this Court is itself worth knowing. Do not filter these by whether they seem important — report them and let the memo decide.
+>
+> **Part 3 — Discrepancies.** Note any place where a party's appellate brief characterizes the proceedings below in a way the filings do not support.
+>
+> **Rules:**
+> - Never write "not raised below" without having searched and listed the filings you searched.
+> - Absence of a citation in an appellate brief is not evidence of anything. Ignore what the briefs say about preservation entirely; you are the check on it.
+> - Attribute arguments to the party who made them, and distinguish a party's argument from the court's ruling.
+>
+> Return the structured trace. Do not analyze the merits or recommend.
+
+**Using the results:**
+
+- Every preservation statement in the memo derives from this trace, cited to a district court filing or transcript page.
+- `SEARCHED-NOT-FOUND` supports a non-preservation conclusion — the appellant bears the burden of establishing preservation — but the memo must say the search happened and what it covered.
+- `RECORD-INCOMPLETE` may also be resolved against the appellant, who bears the burden of providing an adequate record, but is stated as a record gap, not as a finding that the issue was never raised.
+- Part 2 findings are placed per Step 4 (at or just before the standard-of-review discussion for the affected issue; in BACKGROUND's procedural history if issue-wide).
+
+**Degradation (`preservation_trace: unavailable`):** if no district court filings reached the manifest, the memo states plainly, in each affected issue's preservation discussion, that preservation could not be independently assessed because the district court filings were not in the materials provided, and reports the parties' competing assertions as assertions. It does **not** report the brief-derived version as a finding, and no issue is analyzed as unpreserved. Confidence on any assessment touching preservation is capped at moderate (Step 3).
 
 ### Step 3: Legal Framing
 
@@ -629,9 +719,11 @@ For each consolidated issue:
 1. **Determine correct standard of review** — adjudicate between the parties' positions using Agent D's precedent analysis (if available). If both sides cite the same standard, adopt it. If they disagree, assess which is correct based on the cited authorities.
 2. **Identify the strongest argument supporting the district court's ruling** — articulate the best case for affirmance with specific citations.
 3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
-4. **Assess preservation** — if there's a waiver/preservation dispute, analyze it before reaching the merits.
+4. **Assess preservation from the Step 2.6 trace** — not from the briefs. State where the issue was raised below with a pinpoint cite to the filing or transcript page, or that the filings named in the trace were searched and it is not there, or that the record is incomplete as to it. If the parties dispute preservation, resolve the dispute against the trace, not against which brief is more confident. **A preservation conclusion sourced to a brief page is not a conclusion — it is the defect Step 2.6 exists to prevent.**
+
+   **If `preservation_trace: unavailable`,** say so in this issue's preservation discussion and treat preservation as an open question — then **analyze the merits in full anyway.** An untraced non-preservation belief must not truncate the merits analysis; a false "unpreserved" that shortens an issue costs the Court more than a false "preserved," because it tells a justice the issue can be disposed of without reaching it. An untraced preservation doubt flags; it never disposes.
 5. **Flag statutory interpretation issues** — if the issue turns on statutory text, identify the interpretive question, the competing readings, and any relevant canons.
-6. **If `strength_mode` is enabled (default)**, assess which side has the stronger argument on this issue and whether it is more consistent with the text, precedent, and established interpretive principles, with reasoning. State the assessment with appropriate qualifications and hedging and an explicit confidence level (high / moderate / low), and note what would change it. Do **not** state or imply a recommended disposition — do not say the ruling should be affirmed, reversed, or remanded, or that the Court should rule a particular way; the assessment addresses argument strength and doctrinal fit, not how the case should be decided. Where the stronger argument may still not carry the outcome (e.g., a preservation problem, the standard of review, or a dispositive threshold ground), say so and lower the confidence accordingly. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If `strength_mode` is disabled, end the analysis after presenting both sides' strongest positions without assessing which is stronger.
+6. **If `strength_mode` is enabled (default)**, assess which side has the stronger argument on this issue and whether it is more consistent with the text, precedent, and established interpretive principles, with reasoning. State the assessment with appropriate qualifications and hedging and an explicit confidence level (high / moderate / low), and note what would change it. Do **not** state or imply a recommended disposition — do not say the ruling should be affirmed, reversed, or remanded, or that the Court should rule a particular way; the assessment addresses argument strength and doctrinal fit, not how the case should be decided. Where the stronger argument may still not carry the outcome (e.g., a preservation problem, the standard of review, or a dispositive threshold ground), say so and lower the confidence accordingly. **Confidence is asymmetric as to preservation:** any assessment that rests on an issue being unpreserved, waived, or first raised on appeal is **capped at moderate** unless the Step 2.6 trace returned `PRESERVED` or `SEARCHED-NOT-FOUND` for that issue. A `RECORD-INCOMPLETE` verdict or an unavailable trace caps it at moderate no matter how confident the appellee's waiver argument sounds. For close questions, suggest one or two questions for oral argument that would press counsel on the central strength or weakness of a position. If `strength_mode` is disabled, end the analysis after presenting both sides' strongest positions without assessing which is stronger.
 
 ### Step 3.5: Interpretive Panel (Optional)
 
@@ -722,7 +814,7 @@ When multiple record items appear together, hyperlink each separately:
 
 **Paragraph symbol rule:** Never use "para." or "paras." anywhere in the memo — always use ¶ (singular) or ¶¶ (plural). In record citations, no space between ¶/¶¶ and the number (per N.D.R.App.P. 30): `¶3`, `¶¶7–14`. In case law citations, include a space (per Bluebook): `¶ 12`, `¶¶ 6–8`.
 
-**Length target (soft):** Aim for a **6–10 page** memo (see `memo-format.md` for the page/word proxy). To reach it, **prune facts not necessary to understand and resolve the issues on appeal** — completeness of *reading* (the Essential-Documents Rule) does not mean completeness of *recounting*. Use judgment on analytical depth: simple cases stay short; genuinely complex or multi-issue cases warrant more. **A memo over 15 pages must be justified** by multiple issues or particularly complicated issues — if it runs long for any other reason, it is over-written; cut. Reading everything essential and then writing tight are the same discipline, not opposites.
+**Length target (soft):** Aim for an **8–12 page** memo (see `memo-format.md` for the page/word proxy). To reach it, **prune facts not necessary to understand and resolve the issues on appeal** — completeness of *reading* (the Essential-Documents Rule) does not mean completeness of *recounting*. Use judgment on analytical depth: simple cases stay short; genuinely complex or multi-issue cases warrant more. **A memo over 18 pages must be justified** by multiple issues or particularly complicated issues — if it runs long for any other reason, it is over-written; cut. Reading everything essential and then writing tight are the same discipline, not opposites.
 
 **Proof of reading:** State the district court's procedural posture and **each ground of decision** from the order itself, with a pinpoint cite to the order (e.g., `R38:2–9`). If you cannot pinpoint-cite the order's grounds, you have not read it — return to Step 2.5. Attribute court findings to the court, not to a party.
 
@@ -731,8 +823,10 @@ Write the complete bench memo in markdown per `memo-format.md`:
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
 2. **Quick Reference** — 4-8 key documents with record citations (from Agent A) — every one of which was read per Step 2.5
 3. **Opening [¶1]** — summarize the case and identify all issues. If `strength_mode` (default), summarize each issue's strength assessment with its confidence level (state no recommended disposition). Otherwise, state the key tension or question the case presents.
-4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues.
+4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues. Where a **whole claim or theory was litigated below and abandoned on appeal** (Step 2.6 Part 2) — one with no issue section to live in — note it here in a sentence, with the pinpoint where it was raised.
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
+   - Preservation, sourced to the Step 2.6 trace with a pinpoint to the district court filing or transcript page — never to a brief page
+   - Any **argument raised below but abandoned on appeal** bearing on this issue (Step 2.6 Part 2), stated in a sentence at or just before the standard of review. It belongs there because it goes to the scope of review — what the appellant has and has not brought before the Court, and whether an unchallenged ground of the district court's decision still stands
    - Standard of review with case authority
    - Appellant's arguments with citations
    - Appellee's arguments with citations
@@ -748,7 +842,11 @@ Review the memo against this checklist before presenting:
 - [ ] **Every order and judgment on appeal was read in full** and is pinpoint-cited; its grounds of decision are stated from the order itself, not the briefs (Essential-Documents Rule / Step 2.5)
 - [ ] **Every Quick Reference / key / highly-relevant document was actually read** — none is characterized solely from a party's brief; any genuinely-absent one is explicitly flagged
 - [ ] **No hedging about the district court's reasoning** ("appears to," "seems," "evidently") — any such phrase is resolved by reading the order, or flagged as a true record gap
-- [ ] **Length is appropriate:** ~6–10 pages typical; facts not needed to resolve the issues are pruned; if over 15 pages, the length is justified by multiple or particularly complex issues
+- [ ] **Every preservation conclusion cites a district court filing or transcript page — never a brief page.** Search the draft for "the brief identifies no," "the brief does not cite," "the brief is silent," and any other sentence whose subject is a brief where the reader needs a record fact; each must be converted to a record-based statement or replaced with an explicit statement that the filings were searched (naming them) or were not available
+- [ ] **No issue is characterized as unpreserved, waived, or first raised on appeal** except in one of the three permitted forms (searched-and-absent naming the filings searched / record-incomplete naming what is missing / preserved with a pinpoint)
+- [ ] **Arguments raised below but abandoned on appeal (Step 2.6 Part 2) are reported** — at or just before the affected issue's standard of review, or in BACKGROUND if issue-wide — or the trace returned none
+- [ ] **If `preservation_trace: unavailable`:** the memo says so in each affected issue, presents the parties' preservation positions as assertions rather than findings, analyzes every issue's merits in full, and caps preservation-dependent confidence at moderate
+- [ ] **Length is appropriate:** ~8–12 pages typical; facts not needed to resolve the issues are pruned; if over 18 pages, the length is justified by multiple or particularly complex issues
 - [ ] All issues from Step 2 are addressed
 - [ ] Paragraph numbering [¶1], [¶2], etc. is sequential throughout
 - [ ] Every fact in BACKGROUND has a record citation
@@ -756,7 +854,7 @@ Review the memo against this checklist before presenting:
 - [ ] **Any supplemental authority added beyond the briefs (Step 3.6) is tagged as the memo's addition, presented neutrally, and verified via the mandatory Step 9** — or none was added
 - [ ] Both sides' arguments are fairly presented with citations
 - [ ] Disputed facts are noted inline in BACKGROUND with both versions and cites
-- [ ] Preservation is addressed for each issue (or noted as not at issue)
+- [ ] Preservation is addressed for each issue (or noted as not at issue), grounded in the Step 2.6 trace
 - [ ] Each issue analysis identifies the strongest argument for and against the district court
 - [ ] Exhibit table included if ≥ 2 contested exhibits
 - [ ] Writ terminology used correctly if writ proceeding
@@ -816,7 +914,7 @@ Wait for the subagent (`TaskOutput` with `block: true`). If it fails or times ou
 Process the **Brief Coverage** table from the audit (Pass 6) to fill genuinely-omitted arguments before finalizing. This is the audit's highest-value feedback: an argument jetmemo never addressed will not surface in its own Step 5 self-review, because jetmemo builds its issue list from the appellant's framing.
 
 1. **Select gaps.** Take every row marked `Addressed = No` or `Partial`. Then **filter out** rows that are correct omissions — do **not** draft fill-ins for an argument that:
-   - was **waived or not preserved** (per the Step 3 preservation analysis / Agent B's waiver arguments);
+   - was **waived or not preserved** — but **only when the Step 2.6 trace returned `SEARCHED-NOT-FOUND` for it.** If the trace is unavailable, or returned `RECORD-INCOMPLETE`, or the non-preservation belief rests on the briefs, **do not apply this filter** — draft the fill-in. Otherwise a false non-preservation finding suppresses the very gap jetredline's Pass 6 exists to catch, and the backstop is disabled by the error it was placed there to catch;
    - is **mooted** by the disposition of another issue;
    - is **already treated under a different heading** (scan the memo — the brief-matcher can flag a consolidated sub-argument as missing; that is a false positive).
    
@@ -968,6 +1066,8 @@ These strategies make it affordable to read the **whole essential set** thorough
 | ----------------- | ----------------------------------------- | ------------------------------------ |
 | Briefs (30-50pp)  | `extract_text.py` -> `.txt`, agent reads text | ~50% token savings vs multimodal PDF |
 | Large record PDFs | `splitmarks` first, then extract per-file | Agents load only relevant documents  |
+| District court filings | Read the record index first, then only the filings that could bear on an issue | The index bounds the search; filings are short relative to briefs |
+| Long transcripts | Agent C3 indexes where law was argued; Agent G reads only those ranges | One pass locates, one pass reads — neither reads it whole for the other's purpose |
 | Scanned PDFs      | Agent uses `Read` on PDF directly         | Fallback when text extraction fails  |
 | ND opinions       | Agent reads `.md` directly                | Already markdown, very efficient     |
 | N.D.C.C. / N.D.A.C. | Agent reads local `.md`, web fallback  | Local is fastest; web if ~/refs absent |
@@ -981,12 +1081,14 @@ These strategies make it affordable to read the **whole essential set** thorough
 - If `splitmarks` finds no bookmarks: document stays intact, processed as-is
 - If `splitmarks` output still contains large multi-item files: process as-is, but note in the manifest that granular splitting was not possible
 - If >50% of documents fail text extraction: abandon parallel approach, fall back to sequential multimodal reads
-- **Never** let any fallback drop an essential document (order, judgment, key document). A scanned or unsplittable essential document is read visually, not skipped; a missing one is escalated to the user (Step 2.5), not inferred from the briefs.
+- **Never** let any fallback drop an essential document (order, judgment, key document, or a `dc-filing` bearing on preservation). A scanned or unsplittable essential document is read visually, not skipped; a missing one is escalated to the user (Step 2.5), not inferred from the briefs.
+- If **Agent G (Step 2.6) fails or times out**, run the trace in main context — do not proceed without one. A failed trace is not the same as an unavailable one: `preservation_trace: unavailable` is reserved for the case where the district court filings genuinely are not in the materials, and it carries memo-visible disclosure and a confidence cap. Never set it to route around an agent failure.
 
 ## Important Rules
 
 - **Read the essential documents — never guess them.** Every order, judgment, and key/highly-relevant document is read in full before analysis, regardless of length, scan quality, or token cost (see the Essential-Documents Rule and Step 2.5). Never infer an order's grounds or reasoning from the briefs; never hedge ("appears to," "seems") around a document you could read.
-- **Write tight.** Read everything essential, then recount only what the issues require. ~6–10 pages is typical; prune unnecessary facts; over 15 pages must be justified by multiple or particularly complex issues.
+- **Preservation is a record fact, never a brief fact.** Never conclude that an issue was unpreserved, waived, or first raised on appeal from the appellate briefs. A brief's failure to cite where an argument was raised is evidence about the brief, not the record — the filing may exist and simply be uncited. Search the district court filings (Step 2.6) and cite what you find, or state that you searched and name what you searched, or state that the record is incomplete. The appellant bears the burden of establishing preservation and of providing an adequate record, so a searched-and-absent finding may be resolved against the appellant — but only after the search.
+- **Write tight.** Read everything essential, then recount only what the issues require. ~8–12 pages is typical; prune unnecessary facts; over 18 pages must be justified by multiple or particularly complex issues.
 - **Never fabricate citations; verify every citation.** Cite a case, statute, or rule only after confirming it exists and says what it is cited for — via the ndcourts MCP, a local `~/refs` source, or another authoritative source. This is an anti-fabrication and verification rule, **not** a briefs-only rule. The memo may and often should cite relevant authority the parties did not cite: identifying on-point cases, statutes, or rules the parties missed is part of assisting the Court in applying the correct law consistent with its own precedent, regardless of what the parties briefed. When citing authority neither party cited, verify it with extra care and make clear (in text or a parenthetical) that it was not cited by the parties, so the reader knows it is the memo's addition.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
 - **Be neutral; never recommend a disposition.** Present both sides fairly before offering analysis. The memo never states or implies a recommended disposition (no affirm/reverse/remand recommendation; never that the Court should rule a particular way) in any mode. In `strength_mode` (default), it may assess which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — always with explicit qualifications, hedging, and confidence levels, and always leaving the disposition to the Court. In neutral mode it presents the strongest arguments for each position and leaves the assessment to the reader.

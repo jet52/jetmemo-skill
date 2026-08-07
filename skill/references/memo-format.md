@@ -67,13 +67,13 @@ The provenance footer (the final italic line) is **stamped automatically by `scr
 
 ## Length (soft guideline)
 
-- **Typical memo: 6–10 pages.** This is a target, not a hard cap.
+- **Typical memo: 8–12 pages.** This is a target, not a hard cap.
 - To reach it, **prune facts not necessary to understand and resolve the issues on appeal.** Reading every essential document in full (the Essential-Documents Rule) is required; *recounting* all of it is not. The BACKGROUND should carry only the facts the issues turn on.
 - **Use judgment on analytical depth.** Simple cases stay short. Genuinely complex or multi-issue cases warrant more development — depth that the disposition actually needs, not depth for its own sake.
-- **Over 15 pages must be justified** by multiple issues or particularly complicated issues. If a memo runs that long for any other reason, it is over-written — cut.
+- **Over 18 pages must be justified** by multiple issues or particularly complicated issues. If a memo runs that long for any other reason, it is over-written — cut.
 - Where a threshold ground disposes of an issue, it is appropriate to note that alternative grounds need not be reached rather than developing each at equal length.
 
-**Page/word proxy (while drafting in markdown):** the bench-memo template (QTPalatine 13pt, 1.2 line spacing, justified) renders at *roughly* 350–450 words per page — so ~6–10 pages is approximately **2,500–4,000 words** of body text, and 15 pages is roughly **5,500–6,500 words**. Treat these as approximate; the rendered `.docx` page count (SKILL Step 8) is the authority. If unsure, render and check.
+**Page/word proxy (while drafting in markdown):** the bench-memo template (QTPalatine 13pt, 1.2 line spacing, justified) renders at *roughly* 350–450 words per page — so ~8–12 pages is approximately **3,000–5,000 words** of body text, and 18 pages is roughly **6,500–7,500 words**. Treat these as approximate; the rendered `.docx` page count (SKILL Step 8) is the authority. If unsure, render and check.
 
 ## Formatting Rules
 
@@ -152,28 +152,43 @@ Do not create a separate "disputed facts" section — weave the disputes into th
 
 Each must include:
 
-1. **Preservation** — whether the issue was preserved below, with record citation to the objection/motion. If disputed, note both sides' positions. If unpreserved, note the applicable standard (plain error, etc.). May be omitted when preservation is clearly not at issue (e.g., pure legal questions raised in dispositive motions).
-2. **Standard of review** — with specific case authority from the briefs
-3. **Appellant's arguments** — with citations to briefs and record
-4. **Appellee's arguments** — with citations to briefs and record
-5. **Analysis** — strongest argument for the district court's ruling, then strongest counterargument, then assessment. If `strength_mode` (default), add the strength assessment with its confidence level; never a recommended disposition.
+1. **Preservation** — sourced to the Step 2.6 preservation trace, **never to a brief page.** Exactly one of three forms:
+   - **Preserved** — pinpoint cite to the district court filing or transcript page where the argument was raised.
+   - **Searched and absent** — the district court filings were searched and the argument is not in them; **name the filings searched.** Note the applicable standard (plain error/obvious error, etc.) and that the appellant bears the burden of establishing preservation.
+   - **Record incomplete** — the filings that would show preservation are not in the record on appeal; name what is missing. This may be resolved against the appellant, who bears the burden of providing an adequate record, but is a record gap, not a finding that the issue was never raised.
+   
+   If disputed, note both sides' positions — then resolve the dispute against the trace, not against the briefs. **Never write that the brief "identifies no" or "does not cite" a filing** as though it were a finding about the record; see the Essential-Documents Rule's subject-substitution and negative-proof rules. May be omitted only when preservation is genuinely not at issue (e.g., a pure legal question decided on a dispositive motion).
+2. **Scope of review** *(when applicable)* — any argument raised below and abandoned on appeal that bears on this issue, with the pinpoint where it was raised (Step 2.6 Part 2). One sentence. It sits here because it goes to what the appellant has brought before the Court, and whether an unchallenged ground of the district court's decision still stands.
+3. **Standard of review** — with specific case authority from the briefs
+4. **Appellant's arguments** — with citations to briefs and record
+5. **Appellee's arguments** — with citations to briefs and record
+6. **Analysis** — strongest argument for the district court's ruling, then strongest counterargument, then assessment. If `strength_mode` (default), add the strength assessment with its confidence level; never a recommended disposition.
 
 Template:
 
 ```
 ## I. {Issue Statement}
 
-[¶N] **Preservation:** {Whether this issue was preserved below, with record
-citation to the objection/motion. If disputed, note both sides' positions.
-If unpreserved, note the applicable standard (plain error, etc.).}
+[¶N] **Preservation:** {One of three, from the Step 2.6 trace — never from a
+brief page: (a) raised below at {pinpoint to the district court filing or
+transcript page}; (b) the district court filings were searched — {name them} —
+and the argument is not in them, so {plain-error/obvious-error standard}
+applies and the appellant bears the burden of establishing preservation; or
+(c) the filings that would show preservation are not in the record on appeal
+— {name what is missing}. If disputed, note both sides' positions, then
+resolve against the trace.}
 
-[¶N+1] **Standard of review:** {Standard with case authority.}
+[¶N+1] **Scope of review:** {Optional — one sentence. Any argument raised below
+and abandoned on appeal that bears on this issue, with the pinpoint where it
+was raised. Omit if the trace found none.}
 
-[¶N+2] {Appellant's arguments with citations to briefs and record.}
+[¶N+2] **Standard of review:** {Standard with case authority.}
 
-[¶N+3] {Appellee's arguments with citations to briefs and record.}
+[¶N+3] {Appellant's arguments with citations to briefs and record.}
 
-[¶N+4] **Analysis:** {Strongest argument for the district court's ruling.
+[¶N+4] {Appellee's arguments with citations to briefs and record.}
+
+[¶N+5] **Analysis:** {Strongest argument for the district court's ruling.
 Then the strongest counterargument. Then assessment. If strength_mode (default),
 state which side is stronger with a confidence level and qualifications;
 never a recommended disposition.}
