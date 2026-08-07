@@ -104,7 +104,7 @@ jetmemo-skill/
 └── skill/
     ├── SKILL.md
     ├── lib/
-    │   └── jetcite/          ← bundled citation library (v2.1.2)
+    │   └── jetcite/          ← bundled citation library (v2.9.0)
     │       ├── models.py     ← citation data models
     │       ├── scanner.py    ← regex-based citation extraction
     │       ├── resolver.py   ← URL resolution engine
