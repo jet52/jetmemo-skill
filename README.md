@@ -23,7 +23,7 @@ how any case should or will be decided. It is not legal advice.
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) installed
 - `pypdf` — PDF processing library (`pip install pypdf`)
-- Reference data (see [Reference Data](#reference-data) below)
+- An MCP legal-research source (see [Legal Research Sources](#legal-research-sources) below) — not strictly required, but citation verification is much weaker without one
 
 ### Optional PDF extractors
 
@@ -113,6 +113,8 @@ jetmemo-skill/
     │       └── sources/      ← URL source modules (ndcourts, courtlistener, etc.)
     ├── references/
     │   ├── memo-format.md
+    │   ├── model-comparison.md
+    │   ├── nd-citation-style.md
     │   └── style-spec.md
     └── scripts/
         ├── check_update.py
@@ -124,53 +126,81 @@ jetmemo-skill/
         └── verify_citations.py
 ```
 
-## Reference Data
+## Legal Research Sources
 
-The skill uses local reference datasets for citation verification and precedent lookup. Without these, the memo will still generate but citation verification and precedent analysis will be limited.
+Citation verification and precedent lookup run against MCP servers. Without either
+one connected the memo still generates, but every citation resolves by web fetch —
+slower, and limited to whatever summary a public page exposes rather than full text
+with paragraph pinpoints.
 
-Download the reference archives from the [jetcite v2.0.0 release](https://github.com/jet52/jetcite/releases/tag/v2.0.0) and install to `~/refs/`:
+### ndlaw — North Dakota primary law (strongly recommended)
 
-```bash
-mkdir -p ~/refs
+Covers the whole ND corpus: **opinions 1889–present** (20,000+, current to within a
+day), the **Constitution**, the **Century Code**, **court rules**, the
+**Administrative Code**, and **Attorney General** and **Judicial Ethics Advisory
+Committee** opinions. It also carries what a flat text file cannot express — a
+citator (`check_treatment`, `get_subsequent_history`), cross-references, and
+**effective-date versioning**, so a provision can be read as it stood on the date
+the district court applied it rather than as it reads today.
 
-# Opinions — precedent verification (Agent D)
-unzip nd-opin-markdown.zip -d ~/refs/opin/ND
-unzip nd-opin-NW2d.zip -d ~/refs/opin/NW2d
-unzip nd-opin-NW.zip -d ~/refs/opin/NW
+Two ways to connect:
 
-# Statutes and regulations — statutory verification (Agent E)
-unzip nd-code.zip -d ~/refs/statute/NDCC
-unzip nd-regs.zip -d ~/refs/reg/NDAC
+| | Endpoint | Notes |
+|---|---|---|
+| **Self-hosted** (recommended) | [`ndlaw-mcp`](https://github.com/jet52/ndlaw-mcp) over stdio | Per-call latency in single-digit milliseconds against roughly 100–250 ms for the remote, and it works with no network at all — which is what makes it usable in sandboxes that block outbound HTTP. |
+| **Hosted** | `https://ndlaw.org/mcp` | Nothing to install. Add it as a remote MCP connector. |
 
-# Court rules and constitution (Agent E)
-unzip nd-rule.zip -d ~/refs/rule
-unzip nd-cnst.zip -d ~/refs/cnst/ND
-```
+Either way the skill finds the tools by *name*, not by namespace prefix, so it works
+whether they arrive as `mcp__ndlaw__*`, `mcp__claude_ai_ndlaw__*`, or anything else
+your host assigns. If you connect more than one, prefer the local server.
 
-| Archive | Contents | Install to | Purpose |
-|---------|----------|------------|---------|
-| [nd-opin-markdown.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-markdown.zip) | ND opinions by neutral cite (2024 ND 156) | `~/refs/opin/ND/` | Precedent lookup — paragraph-level |
-| [nd-opin-NW2d.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-NW2d.zip) | ND opinions by N.W.2d cite | `~/refs/opin/NW2d/` | Precedent lookup — regional reporter |
-| [nd-opin-NW.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-opin-NW.zip) | ND opinions by N.W. cite | `~/refs/opin/NW/` | Precedent lookup — early reporter |
-| [nd-code.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-code.zip) | North Dakota Century Code | `~/refs/statute/NDCC/` | Statutory text verification |
-| [nd-regs.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-regs.zip) | North Dakota Administrative Code | `~/refs/reg/NDAC/` | Administrative rule verification |
-| [nd-rule.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-rule.zip) | North Dakota Court Rules | `~/refs/rule/` | Court rule verification |
-| [nd-cnst.zip](https://github.com/jet52/jetcite/releases/download/v2.0.0/nd-cnst.zip) | North Dakota Constitution | `~/refs/cnst/ND/` | Constitutional text verification |
+### CourtListener — everything outside North Dakota
 
-If `~/refs/` subdirectories are missing, the skill falls back to web lookups (ndcourts.gov, then CourtListener). Web fallbacks provide syllabus/highlight summaries but not full opinion text, so pinpoint paragraph verification is only available with local files.
+Supplies the case law ndlaw does not carry: U.S. Supreme Court, federal, and
+other-state opinions, plus any ND opinion missing from the ND corpus. Connect it as
+a remote MCP server; no API key is required for the search endpoints the skill uses.
+
+### Precedence
+
+The skill applies this order at every lookup and falls through on a miss:
+
+1. **ndlaw** — every ND authority: cases, statutes, rules, constitution, admin code.
+2. **CourtListener** — non-ND cases.
+3. **Web** — official sources via URLs generated by the bundled jetcite
+   (ndcourts.gov, ndlegis.gov, govinfo.gov, Cornell LII, CourtListener, Justia).
+
+It will not go to the web for any ND authority without trying ndlaw first, and Agents
+D and E each report which tier produced each result — so a web fallback for ND
+material is visible in the finished memo rather than silent.
+
+**Non-ND statutes and rules** — U.S.C., C.F.R., the federal rules, the U.S.
+Constitution — have no MCP tier, since CourtListener indexes case law rather than
+codes. Those resolve at tier 3 by web fetch to the official source.
+
+> **Optional local cache.** If a `~/refs/` tree exists, the skill will read from it
+> and `verify_citations.py --cache` will grow it as it goes. It is no longer part of
+> setup: ndlaw supersedes it for ND material and is strictly better. Its remaining
+> use is offline or egress-blocked operation.
 
 ### Cowork (sandboxed environments)
 
-In Cowork, `~/refs` doesn't persist across sessions. To use local references, mount your `refs` directory via the Cowork folder picker. At startup the skill auto-detects a mounted folder named `refs` and symlinks `~/refs` to it — no manual setup needed.
+Self-hosted ndlaw is the best answer here, because it needs no network at all.
 
-**Network access for citation URLs.** Web fallbacks and ND opinion PDF resolution require outbound access to official-source domains (ndcourts.gov, courtlistener.com, etc.), which Cowork blocks by default. Add the domains listed in [`skill/lib/jetcite/NETWORK.md`](skill/lib/jetcite/NETWORK.md) to the Cowork egress allowlist (sandbox settings → **Allow network egress** → **Additional allowed domains**), then start a new session. Without this, ND citations resolve to a search URL rather than the direct opinion PDF.
+If you rely on web fallbacks instead, Cowork blocks outbound access by default. Add
+the domains listed in [`skill/lib/jetcite/NETWORK.md`](skill/lib/jetcite/NETWORK.md)
+to the egress allowlist (sandbox settings → **Allow network egress** → **Additional
+allowed domains**), then start a new session. Without this, citations resolve to a
+search URL rather than the direct source. A `~/refs` folder mounted via the Cowork
+folder picker is auto-detected and symlinked at startup.
 
 ## Other Dependencies
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | PDF text extraction and packet splitting | Required |
-| [jetcite](https://github.com/jet52/jetcite) v2.1.2 | Citation extraction and URL resolution | Bundled |
+| [jetcite](https://github.com/jet52/jetcite) v2.9.0 | Citation extraction and URL resolution | Bundled |
+| [ndlaw-mcp](https://github.com/jet52/ndlaw-mcp) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
+| [CourtListener MCP](https://www.courtlistener.com/) | Non-ND case law | Recommended |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 | [jetredline](https://github.com/jet52/jetredline) v4.4.0+ | Memo audit (style, consistency, fact/brief coverage) | Optional |
 

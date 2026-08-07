@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.14.0
+version: 3.15.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -36,6 +36,8 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 ### ~/refs directory layout
 
 All local reference material lives under `~/refs/`. This directory may or may not exist for a given user; always check before relying on it and fall back to web lookups when absent.
+
+> **`~/refs/` is a fallback tier, not the primary one.** For any **North Dakota** authority — cases, statutes, court rules, the constitution, the administrative code — the ndlaw MCP comes first (see **Legal-Research MCP Servers**): it carries the same text plus effective-date versioning and the citator, neither of which a flat markdown file can express. `~/refs/` is no longer part of setup and many users will not have it. Where it earns its keep: **non-ND** statutes and rules (U.S.C., C.F.R., federal rules, the U.S. Constitution), which no MCP tier covers, and offline or egress-blocked operation.
 
 **Opinions** — `~/refs/opin/{reporter}/{volume or year}/{file}.md`. Examples:
 - 2024 ND 156 → `~/refs/opin/ND/2024/2024ND156.md`. Paragraphs are marked `[¶N]`.
@@ -208,23 +210,25 @@ This rule governs the entire pipeline below; Steps 0, 2.5, 2.6, and 5 enforce it
 
 ---
 
-## Legal-Research MCP Servers (ndcourts-mcp, CourtListener)
+## Legal-Research MCP Servers (ndlaw, CourtListener)
 
-Two optional MCP servers improve case-law lookup and verification when connected. **They are augmentation, not replacement** — every check degrades gracefully to the existing pipeline (`~/refs/` local files → `WebFetch` on the citation's `url` → CourtListener search API). Never fail or stall a memo because an MCP server is absent or returns no data.
+Two optional MCP servers improve authority lookup and verification when connected. **They are augmentation, not replacement** — every check degrades gracefully to the existing pipeline (`~/refs/` local files → `WebFetch` on the citation's `url` → CourtListener search API). Never fail or stall a memo because an MCP server is absent or returns no data.
 
-**Availability:** Before relying on a server, check whether its tools are present in your tool set — an ndcourts-mcp tool such as `mcp__ndcourts__verify_citation`, or a CourtListener tool such as `mcp__claude_ai_CourtListener__search`. If a tool is not present, skip silently to the next tier.
+**Availability:** Before relying on a server, check whether its tools are present in your tool set — an ndlaw tool such as `verify_citation` or `lookup_authority`, or a CourtListener tool such as `mcp__claude_ai_CourtListener__search`. If a tool is not present, skip silently to the next tier.
 
-**Source precedence — apply at every case-citation lookup or verification; fall through on a miss:**
+> **Namespace.** ndlaw tools appear under whatever prefix the host assigns — commonly `mcp__ndlaw__*` for a locally-run server or `mcp__claude_ai_ndlaw__*` for a hosted connector. **Do not hard-match one prefix**; look for the tool *names* below and call whichever prefix is present. If several ndlaw servers are connected at once they carry the same corpus and the same tools, so pick one and stay with it — prefer a local server when there is one (per-call latency in single-digit milliseconds against roughly 100–250 ms for a remote, and no network dependency).
+>
+> This server was formerly packaged as **ndcourts-mcp** under an `mcp__ndcourts__*` prefix. That name is retired. Any instruction to call `mcp__ndcourts__…` is stale — the call will silently find no tool and the run will fall through to the web tier.
 
-1. **ndcourts-mcp** (primary, North Dakota cases) — a local ND opinion corpus. Deterministic, no network or proxy, so it works in sandboxes (e.g. Cowork) where outbound HTTP is restricted.
-2. **CourtListener MCP** (secondary) — case data ndcourts-mcp lacks: U.S. Supreme Court, federal, and other-state authorities, and ND opinions missing from the ND corpus.
-3. **Existing pipeline** (fallback) — `~/refs/` local files, then `WebFetch` on the `url` from `citations.json`, then the CourtListener search API. The only path when no MCP server is connected.
+**Source precedence — apply at every authority lookup or verification; fall through on a miss:**
 
-A local `~/refs/` opinion file, when present, is equally authoritative and instant; use it or the MCP — whichever is available — before any web fetch. **Never go to the web for an ND case citation without first trying ndcourts-mcp or a local file.**
+1. **ndlaw MCP** (primary for **all** North Dakota authority) — ND opinions 1889–present, the ND Constitution, the Century Code, court rules, and the Administrative Code, plus Attorney General and Judicial Ethics Advisory Committee opinions where installed. Deterministic and, when run locally, free of network or proxy — so it works in sandboxes (e.g. Cowork) where outbound HTTP is restricted.
+2. **CourtListener MCP** (secondary) — the case law ndlaw does not carry: U.S. Supreme Court, federal, and other-state authority, and any ND opinion missing from the ND corpus.
+3. **Existing pipeline** (fallback) — `~/refs/` local files, then `WebFetch` on the `url` from `citations.json`, then the CourtListener search API. The path when no MCP server is connected, and the primary path for **non-ND** statutes, rules, and constitutions (U.S.C., C.F.R., federal rules, the U.S. Constitution), which neither server covers.
 
-**Out of scope for both servers:** the authoritative text of statutes, court rules, the constitution, and the administrative code — these always resolve through the existing pipeline (Agent E / `~/refs/` / web). ndcourts-mcp covers ND *opinions* only.
+**Never go to the web for any ND authority — case, statute, rule, constitutional provision, or admin-code section — without first trying ndlaw.** A local `~/refs/` file is instant and remains a valid fallback, but ndlaw supersedes it for ND material: it carries the same text plus effective-date versioning, the citator, and cross-references that a flat markdown file cannot express.
 
-**ndcourts-mcp tools (call by full `mcp__ndcourts__` name):**
+**ndlaw tools — case law:**
 
 - `lookup_opinion(citation, include_text=False, text_limit=5000)` → metadata and all known parallel citations for a cite; set `include_text=True` for the first `text_limit` characters.
 - `get_opinion_text(citation, offset=0, limit=10000)` → opinion text in chunks; paginate by advancing `offset` (max `limit` 50000).
@@ -232,8 +236,18 @@ A local `~/refs/` opinion file, when present, is equally authoritative and insta
 - `verify_citation(query, expected_case_name="…")` → `found`, canonical case name, filing date, authoring justice, the full Redbook parallel-cite set, and a ready-to-paste `formatted` cite; catches wrong volume/page/year. With `expected_case_name`, flags name drift.
 - `verify_quotation(citation, quote)` → whether the quote is verbatim (whitespace/curly-quote/dash-tolerant), a word-level diff of any discrepancy, the closest actual text, and the pinpoint ¶.
 - `case_summary(citation)` → one-call front matter (caption, parallel cites, date, author, panel, voting record, disposition, ¶ count). **`disposition` and `syllabus_points` are derived/heuristic — verify against the opinion.**
+- `search_opinions(query, …)` → full-text search. `get_citing_opinions`, `more_like_this`, `check_treatment`, `get_subsequent_history` → the citator surface Agent F uses.
 
-**Cardinal caution:** ndcourts-mcp is a research aid, not an authoritative reporter; derived fields (disposition, syllabus) and the `antecedent_name` heuristic are best-effort. Use MCP results to locate and check authority, but cite to the opinion text itself.
+**ndlaw tools — statutes, rules, constitution, admin code** (this is the corpus a prior version of this skill wrongly declared out of scope):
+
+- `lookup_authority(citation, as_of_date=None)` → the text of an N.D.C.C. section, court rule, constitutional provision, or N.D.A.C. section, with heading, effective window, enacting authority, source URL, and a count of opinions construing it. **`as_of_date` (ISO `YYYY-MM-DD`) returns the version in force on that date** — the only way to read a provision as the district court applied it, and something `~/refs/` cannot do at all. The 1889↔1981 constitutional renumbering is bridged automatically.
+- `get_authority_history(citation)` → the amendment history of a provision.
+- `search_authority(query, …)` → full-text search across the constitution, code, rules, and admin code.
+- `find_opinions_construing(authority)` → the opinions citing a provision.
+- `get_notes_of_decisions(authority, subsection=…, …)` → an annotated notes-of-decisions view: citing sentences with ¶ pinpoints, the subsection each mention cites, depth-of-treatment signals, and the provision version in force when each opinion was filed.
+- `get_provision_xrefs(citation)` → what a provision cites and everything that cites it, across corpora.
+
+**Cardinal caution:** ndlaw is a research aid, not an authoritative reporter. Derived and heuristic fields — `disposition`, `syllabus_points`, every citator and notes-of-decisions signal, and jetcite's `antecedent_name` — are best-effort and explicitly non-authoritative. Use MCP results to locate and check authority; cite to the text itself.
 
 ---
 
@@ -251,7 +265,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 - Focused extraction instructions
 - Expected output format (structured markdown)
 
-**For Agent D** (and any agent doing citation lookups), also **copy the "Legal-Research MCP Servers" section above into the agent's prompt** — the subagent does not read this SKILL, so it needs the source precedence and tool signatures inline to prefer the MCP over the web.
+**For Agents D and E** (and any agent doing citation or authority lookups), also **copy the "Legal-Research MCP Servers" section above into the agent's prompt** — including the namespace note, so the subagent matches tool *names* rather than a hard-coded prefix. The subagent does not read this SKILL, so it needs the source precedence and tool signatures inline to prefer the MCP over the web.
 
 ### Agent A: Appellant Brief Analysis
 
@@ -475,7 +489,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > ---
 >
-> **Sources and precedence — MCP before web.** Follow the **Legal-Research MCP Servers** precedence (included in your instructions above): prefer ndcourts-mcp for ND cites and the CourtListener MCP for other case law, falling through to local files and then the web only on a miss. For each ND case citation, verify and retrieve via ndcourts-mcp first — `verify_citation(query, expected_case_name="…")` for existence, caption, and the Redbook parallel-cite set; `verify_quotation(citation, quote)` for any quoted passage; `get_pinpoint(citation, paragraph=N)` for a pinpoint ¶; and `lookup_opinion` / `get_opinion_text` to read the opinion. For U.S. Supreme Court, federal, and other-state cites, try the CourtListener MCP. A local `~/refs/` opinion file is equally authoritative and instant — use the MCP or a local file before any web fetch. **Never go to the web for an ND case citation without first trying ndcourts-mcp or a local file.**
+> **Sources and precedence — MCP before web.** Follow the **Legal-Research MCP Servers** precedence (included in your instructions above): prefer ndlaw for ND cites and the CourtListener MCP for other case law, falling through to local files and then the web only on a miss. For each ND case citation, verify and retrieve via ndlaw first — `verify_citation(query, expected_case_name="…")` for existence, caption, and the Redbook parallel-cite set; `verify_quotation(citation, quote)` for any quoted passage; `get_pinpoint(citation, paragraph=N)` for a pinpoint ¶; and `lookup_opinion` / `get_opinion_text` to read the opinion. For U.S. Supreme Court, federal, and other-state cites, try the CourtListener MCP. A local `~/refs/` opinion file is equally authoritative and instant — use the MCP or a local file before any web fetch. **Never go to the web for an ND case citation without first trying ndlaw or a local file.**
 >
 > The `local_path` and `url` fields in the citation data come from the citation checker (jetcite), which only **generates** paths and URLs — it never fetches over the network and has no knowledge of MCP. Those fields support the local and web-fallback tiers below; they do **not** mean the web should be tried before an MCP. Only fall through to the web steps if no MCP is connected and no local file exists.
 >
@@ -519,7 +533,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **For each citation:**
 >
-> 1. **Locate the opinion.** Prefer a connected MCP — the `ndcourts` MCP for ND cites, the CourtListener MCP for others — before the web. Otherwise use `local_path` if `local_exists`, then `url`, then CourtListener search. If none produces a result, mark as "Not found" and move on.
+> 1. **Locate the opinion.** Prefer a connected MCP — the ndlaw MCP for ND cites, the CourtListener MCP for others — before the web. Otherwise use `local_path` if `local_exists`, then `url`, then CourtListener search. If none produces a result, mark as "Not found" and move on.
 > 2. **Read the cited paragraph** (local: the pinpoint ¶, plus 1-2 surrounding paragraphs for context; web: use the syllabus and snippet). If no pinpoint and using local files, skim the full opinion.
 > 3. **Extract the holding and key rule** from the cited paragraph(s) or syllabus.
 > 4. **Assess support:** Does the cited paragraph (or syllabus) actually support the proposition it's cited for? Report: **Supports**, **Partially supports**, **Does not support**, or **Insufficient data** (when the web fallback syllabus is too sparse to assess).
@@ -530,16 +544,16 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **A. Lookup Methods Summary:** One line tallying how the citations were located, so the reader can confirm the MCP was tried before the web. Count each citation once, by the source that actually produced the result (the `Source` column value):
 >
-> `Lookup methods — ndcourts MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N`
+> `Lookup methods — ndlaw MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N`
 >
-> Then add a one-line **ND web-fallback note**: if every ND citation was resolved via the ndcourts MCP or a local file, write "All ND cites via MCP/local." If any ND citation fell through to the web, list those cites and the reason (e.g., "ndcourts MCP not connected" or "MCP returned no match"). This makes any web fallback for ND opinions explicit rather than silent.
+> Then add a one-line **ND web-fallback note**: if every ND citation was resolved via the ndlaw MCP or a local file, write "All ND cites via MCP/local." If any ND citation fell through to the web, list those cites and the reason (e.g., "ndlaw MCP not connected" or "MCP returned no match"). This makes any web fallback for ND opinions explicit rather than silent.
 >
 > **B. Citation Verification Table:**
 >
 > | Citation | Type | Cited For | Source | Supports? | Holding/Key Rule | Standard of Review |
 > | -------- | ---- | --------- | ------ | --------- | ---------------- | ------------------ |
 >
-> Source column values: "ndcourts MCP", "CourtListener MCP", "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". Record the source that actually produced the result, so the Source column and the section-A tally agree. If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
+> Source column values: "ndlaw MCP", "CourtListener MCP", "Local file", "ndcourts.gov (highlight)", "CourtListener", "CourtListener (syllabus)", "Justia", or "Not found". Record the source that actually produced the result, so the Source column and the section-A tally agree. If step 6 flags a possible mis-cite, prefix the Holding/Key Rule cell with "POSSIBLE MIS-CITE:" and state the name conflict.
 >
 > **C. Legal Framework Narrative:**
 > For each issue area, write a brief narrative (2-4 sentences) summarizing the legal framework established by the cited cases. Group by issue.
@@ -569,9 +583,13 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **Lookup order:**
 >
-> 1. **Local files (fastest):** If `local_exists` is `true`, use the Read tool on `local_path`. Search for the `search_hint` value within the file to find the specific section. Sections appear as `### §` headings within chapter files. For court rules, search for the subsection (e.g., `(b)`) within the rule file.
+> 1. **ndlaw MCP — for every ND authority (statute, court rule, constitutional provision, admin-code section).** Call `lookup_authority(citation)`. It returns the provision text, heading, effective window, enacting authority, and source URL. **When the issue turns on what the provision said at the time of the events or the district court's ruling, pass `as_of_date="YYYY-MM-DD"`** — a provision amended since then would otherwise be verified against text the district court never applied, which is a silent and serious error. Use `get_authority_history(citation)` when the amendment timeline itself matters, and `find_opinions_construing(authority)` or `get_notes_of_decisions(authority, subsection=…)` when you need the opinions applying the provision. Look for the tool names under whatever prefix the host assigned (see the Legal-Research MCP Servers section in your instructions).
 >
-> 2. **Web fallback:** If `local_exists` is `false`, use WebFetch on the `url` from the citation data.
+> 2. **Local files:** If no ndlaw server is connected and `local_exists` is `true`, use the Read tool on `local_path`. Search for the `search_hint` value within the file to find the specific section. Sections appear as `### §` headings within chapter files. For court rules, search for the subsection (e.g., `(b)`) within the rule file. **This tier is primary for non-ND authority** — U.S.C., C.F.R., the federal rules, the U.S. Constitution — which ndlaw does not carry.
+>
+> 3. **Web fallback:** If neither applies, use WebFetch on the `url` from the citation data.
+>
+> **Never go to the web for an ND statute, rule, constitutional provision, or admin-code section without first trying ndlaw.** Report in your table which tier produced each result.
 >
 > **Citations to verify:**
 > [Insert citation entries from citations.json, plus the proposition each is cited for and any quoted language from the briefs]
@@ -587,8 +605,10 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 >
 > **A. Statutory Verification Table:**
 >
-> | Citation | Cited For | Found | Supports? | Quote Accurate? | Actual Text (excerpt) |
-> | -------- | --------- | ----- | --------- | --------------- | --------------------- |
+> | Citation | Cited For | Source | Found | Supports? | Quote Accurate? | Actual Text (excerpt) |
+> | -------- | --------- | ------ | ----- | --------- | --------------- | --------------------- |
+>
+> Source column values: "ndlaw MCP", "ndlaw MCP (as of YYYY-MM-DD)", "Local file", or the web host. If any **ND** authority was resolved on the web, add a line naming it and why (no ndlaw server connected, or ndlaw returned no match) — the same web-fallback disclosure Agent D makes for case law.
 >
 > **B. Key Statutory Provisions:**
 > For each issue area, list the controlling statutory or regulatory provisions with their relevant text excerpted.
@@ -770,18 +790,18 @@ This is **not** a roving search for analogous cases, persuasive authority, or a 
 
 **Four bounding rules (all apply):**
 
-- **Triggered, not blanket.** Run Agent F **only if** the ndcourts MCP is connected **and** Step 3 identified at least one of: a statute/rule that is a point of decision (→ triple #3), or a load-bearing case a party relies on (→ triple #1, #2). If neither, skip this step.
+- **Triggered, not blanket.** Run Agent F **only if** the ndlaw MCP is connected **and** Step 3 identified at least one of: a statute/rule that is a point of decision (→ triple #3), or a load-bearing case a party relies on (→ triple #1, #2). If neither, skip this step.
 - **Cap + clerk standard.** At most ~2–3 supplemental authorities per issue. The test is "would a careful clerk flag this to the justice?" — controlling, material, on the dispositive question. Reject merely analogous, cumulative, or tangential hits.
-- **MCP-grounded or it doesn't happen.** Every candidate must be **retrieved from the ndcourts MCP and actually read** (`search → read → cite`), never recalled from memory and then "verified." This step is **MCP-only**: no `~/refs` and no web fallback — `~/refs` is indexed by citation, not by topic, so it cannot do discovery, and open web search reintroduces the fabrication risk. If the ndcourts MCP is absent, skip the step entirely and note the limitation.
+- **MCP-grounded or it doesn't happen.** Every candidate must be **retrieved from the ndlaw MCP and actually read** (`search → read → cite`), never recalled from memory and then "verified." This step is **MCP-only**: no `~/refs` and no web fallback — `~/refs` is indexed by citation, not by topic, so it cannot do discovery, and open web search reintroduces the fabrication risk. If the ndlaw MCP is absent, skip the step entirely and note the limitation.
 - **Neutral presentation.** Supplemental authority is reported for what it holds. If it cuts against a party (including the party who would otherwise win), say so even-handedly; added authority is not advocacy.
 
-**How to invoke:** Launch one subagent (Task tool, `subagent_type: general-purpose`). **Copy the ndcourts-mcp tool signatures from the "Legal-Research MCP Servers" section into the prompt** (the subagent does not read this SKILL and needs the tool list) — but make clear this lookup is **MCP-only**: do not import the section's local-file/web fallback precedence here. Supply, per issue: the dispositive legal question, the provision(s) that are points of decision, the load-bearing cases each side relies on, and the brief-derived citation list (so the subagent can exclude what the parties already cited).
+**How to invoke:** Launch one subagent (Task tool, `subagent_type: general-purpose`). **Copy the ndlaw tool signatures from the "Legal-Research MCP Servers" section into the prompt** (the subagent does not read this SKILL and needs the tool list) — but make clear this lookup is **MCP-only**: do not import the section's local-file/web fallback precedence here. Supply, per issue: the dispositive legal question, the provision(s) that are points of decision, the load-bearing cases each side relies on, and the brief-derived citation list (so the subagent can exclude what the parties already cited).
 
 **Prompt template:**
 
 > **Supplemental Authority Lookup (bounded)**
 >
-> For each issue below, find ND authority the parties did **not** cite, limited strictly to these three categories. Use the ndcourts MCP **only** — search the corpus and read the opinion; never propose a cite from memory, and do not fall back to local files or web search. If the ndcourts MCP is unavailable, return "MCP unavailable — no supplemental lookup performed" and stop.
+> For each issue below, find ND authority the parties did **not** cite, limited strictly to these three categories. Use the ndlaw MCP **only** — search the corpus and read the opinion; never propose a cite from memory, and do not fall back to local files or web search. If the ndlaw MCP is unavailable, return "MCP unavailable — no supplemental lookup performed" and stop.
 >
 > 1. **Controlling ND precedent the parties missed** on the dispositive question. Anchor the search to authority already in the case: `get_citing_opinions(<lead case the party cites>)` and/or `more_like_this(<lead case>)`, filtered to ND opinions that state or refine the controlling rule. Do not free-search topics.
 > 2. **Negative treatment of a relied-on case:** for each load-bearing case a party cites, `check_treatment(<cite>)` and `get_subsequent_history(<cite>)`. Report only adverse treatment (overruled/superseded/abrogated/limited/doubted).
@@ -795,7 +815,7 @@ This is **not** a roving search for analogous cases, persuasive authority, or a 
 
 **Use of the results in Step 4:** Incorporate each returned authority into the relevant issue's analysis, **tagged as the memo's addition** (in text or a parenthetical, e.g., "(not cited by the parties)"). These citations then flow through Step 7 (linking) and **trigger the mandatory Step 9 verification** (added authority must be verified with extra care). If Agent F returns nothing, the draft proceeds on the parties' authority alone — that is a normal outcome, not a failure.
 
-**Degradation:** No ndcourts MCP → skip this step and note in the memo that supplemental-authority lookup was not run (corpus unavailable). Do not substitute open web search for the bounded corpus lookup.
+**Degradation:** No ndlaw MCP → skip this step and note in the memo that supplemental-authority lookup was not run (corpus unavailable). Do not substitute open web search for the bounded corpus lookup.
 
 ### Step 4: Generate the Memo
 
@@ -877,7 +897,7 @@ Write the memo to a file in the current working directory:
 - Default filename: `{case_number}_memo.md` (e.g., `20990001_memo.md`)
 - If the user specifies a different output path, use that
 
-When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndcourts MCP or pulled from the web — even when Step 9 verification is not run (the brief-only case, where it remains optional). If Agent D did not run (no case citations), omit it.
+When presenting the finished memo to the user, include Agent D's **Lookup Methods Summary** line (and its ND web-fallback note) in your reply, so the user can see whether ND opinions were verified against the ndlaw MCP or pulled from the web — even when Step 9 verification is not run (the brief-only case, where it remains optional). If Agent D did not run (no case citations), omit it.
 
 ### Step 6.5: jetredline Audit (Default On)
 
@@ -1009,16 +1029,16 @@ The human-readable output shows total citations found, how many resolve locally 
 
 For JSON output (to inspect individual citations), add `--json`.
 
-**Verify added authority with extra care.** For each added (non-brief) citation, confirm via the ndcourts MCP, a local `~/refs` source, or another authoritative source that the authority exists **and** supports the proposition it is cited for — `verify_citation` / `verify_quotation` / `get_pinpoint` for ND cases (see the Legal-Research MCP Servers section). A bare resolve by `verify_citations.py` (which only checks that a URL/path can be formed) is **not** sufficient for added authority. If an added citation cannot be confirmed to exist and support its proposition, remove it from the memo — do not ship it flagged-but-unverified.
+**Verify added authority with extra care.** For each added (non-brief) citation, confirm via the ndlaw MCP, a local `~/refs` source, or another authoritative source that the authority exists **and** supports the proposition it is cited for — `verify_citation` / `verify_quotation` / `get_pinpoint` for ND cases (see the Legal-Research MCP Servers section). A bare resolve by `verify_citations.py` (which only checks that a URL/path can be formed) is **not** sufficient for added authority. If an added citation cannot be confirmed to exist and support its proposition, remove it from the memo — do not ship it flagged-but-unverified.
 
-After verification, append a summary to the memo. Carry the **Lookup Methods Summary** from Agent D (section A) into this appendix verbatim, so the finished memo shows whether ND opinions were checked against the ndcourts MCP rather than pulled from the web:
+After verification, append a summary to the memo. Carry the **Lookup Methods Summary** from Agent D (section A) into this appendix verbatim, so the finished memo shows whether ND opinions were checked against the ndlaw MCP rather than pulled from the web:
 
 ```
 ## CITATION VERIFICATION
 
 Verified: X | Unverified: Y | Skipped: Z
 
-Lookup methods (case law) — ndcourts MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N
+Lookup methods (case law) — ndlaw MCP: N | CourtListener MCP: N | local files: N | web: N | not found: N
 ND web-fallback: [Agent D's note — "All ND cites via MCP/local," or the list of ND cites resolved on the web and why]
 
 ### Added Authority (not cited by the parties)
@@ -1089,7 +1109,7 @@ These strategies make it affordable to read the **whole essential set** thorough
 - **Read the essential documents — never guess them.** Every order, judgment, and key/highly-relevant document is read in full before analysis, regardless of length, scan quality, or token cost (see the Essential-Documents Rule and Step 2.5). Never infer an order's grounds or reasoning from the briefs; never hedge ("appears to," "seems") around a document you could read.
 - **Preservation is a record fact, never a brief fact.** Never conclude that an issue was unpreserved, waived, or first raised on appeal from the appellate briefs. A brief's failure to cite where an argument was raised is evidence about the brief, not the record — the filing may exist and simply be uncited. Search the district court filings (Step 2.6) and cite what you find, or state that you searched and name what you searched, or state that the record is incomplete. The appellant bears the burden of establishing preservation and of providing an adequate record, so a searched-and-absent finding may be resolved against the appellant — but only after the search.
 - **Write tight.** Read everything essential, then recount only what the issues require. ~8–12 pages is typical; prune unnecessary facts; over 18 pages must be justified by multiple or particularly complex issues.
-- **Never fabricate citations; verify every citation.** Cite a case, statute, or rule only after confirming it exists and says what it is cited for — via the ndcourts MCP, a local `~/refs` source, or another authoritative source. This is an anti-fabrication and verification rule, **not** a briefs-only rule. The memo may and often should cite relevant authority the parties did not cite: identifying on-point cases, statutes, or rules the parties missed is part of assisting the Court in applying the correct law consistent with its own precedent, regardless of what the parties briefed. When citing authority neither party cited, verify it with extra care and make clear (in text or a parenthetical) that it was not cited by the parties, so the reader knows it is the memo's addition.
+- **Never fabricate citations; verify every citation.** Cite a case, statute, or rule only after confirming it exists and says what it is cited for — via the ndlaw MCP, a local `~/refs` source, or another authoritative source. This is an anti-fabrication and verification rule, **not** a briefs-only rule. The memo may and often should cite relevant authority the parties did not cite: identifying on-point cases, statutes, or rules the parties missed is part of assisting the Court in applying the correct law consistent with its own precedent, regardless of what the parties briefed. When citing authority neither party cited, verify it with extra care and make clear (in text or a parenthetical) that it was not cited by the parties, so the reader knows it is the memo's addition.
 - **Never use placeholder brackets** like [Date], [page], [County]. If information is unavailable, omit it or write "not specified in the record."
 - **Be neutral; never recommend a disposition.** Present both sides fairly before offering analysis. The memo never states or implies a recommended disposition (no affirm/reverse/remand recommendation; never that the Court should rule a particular way) in any mode. In `strength_mode` (default), it may assess which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — always with explicit qualifications, hedging, and confidence levels, and always leaving the disposition to the Court. In neutral mode it presents the strongest arguments for each position and leaves the assessment to the reader.
 - **Record citations are mandatory** for every factual assertion in BACKGROUND.
