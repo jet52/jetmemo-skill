@@ -104,7 +104,7 @@ jetmemo-skill/
 └── skill/
     ├── SKILL.md
     ├── lib/
-    │   └── jetcite/          ← bundled citation library (v2.9.0)
+    │   └── jetcite/          ← bundled citation library (v2.10.1)
     │       ├── models.py     ← citation data models
     │       ├── scanner.py    ← regex-based citation extraction
     │       ├── resolver.py   ← URL resolution engine
@@ -198,7 +198,7 @@ folder picker is auto-detected and symlinked at startup.
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | PDF text extraction and packet splitting | Required |
-| [jetcite](https://github.com/jet52/jetcite) v2.9.0 | Citation extraction and URL resolution | Bundled |
+| [jetcite](https://github.com/jet52/jetcite) v2.10.1 | Citation extraction and URL resolution | Bundled |
 | [ndlaw-mcp](https://github.com/jet52/ndlaw-mcp) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
 | [CourtListener MCP](https://www.courtlistener.com/) | Non-ND case law | Recommended |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
