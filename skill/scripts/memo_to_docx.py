@@ -58,13 +58,15 @@ def setup_numbering(doc):
     numbering_elm = numbering_part._element
 
     # --- Abstract numbering 0: Heading multilevel list ---
+    # Level 0 carries no pStyle link: Heading 1 (BACKGROUND, CONCLUSION) is
+    # unnumbered, and Word renders a numFmt="none" level with empty lvlText
+    # as a stray "." rather than nothing.
     heading_abstract = parse_xml(
         f'<w:abstractNum {nsdecls("w")} w:abstractNumId="10">'
         '  <w:multiLevelType w:val="multilevel"/>'
         '  <w:lvl w:ilvl="0">'
         '    <w:start w:val="1"/>'
         '    <w:numFmt w:val="none"/>'
-        '    <w:pStyle w:val="Heading1"/>'
         '    <w:suff w:val="nothing"/>'
         '    <w:lvlText w:val=""/>'
         '    <w:lvlJc w:val="center"/>'
@@ -228,7 +230,6 @@ def setup_styles(doc, heading_num_id, body_num_id):
     h1.paragraph_format.space_after = NORMAL_SPACE_AFTER
     h1.paragraph_format.space_before = Pt(0)
     h1.paragraph_format.line_spacing = LINE_SPACING
-    _link_style_to_numbering(h1, heading_num_id, ilvl=0)
 
     # --- Heading 2 (issue headings: I., II.) ---
     h2 = doc.styles["Heading 2"]
@@ -344,7 +345,7 @@ _INLINE_RE = re.compile(
 )
 
 
-def _add_hyperlink(paragraph, text, url):
+def _add_hyperlink(paragraph, text, url, bold=False, italic=False):
     """Add a hyperlink run to a paragraph."""
     part = paragraph.part
     r_id = part.relate_to(
@@ -352,11 +353,12 @@ def _add_hyperlink(paragraph, text, url):
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
         is_external=True,
     )
+    extra = ("<w:b/>" if bold else "") + ("<w:i/>" if italic else "")
     hyperlink = parse_xml(
         f'<w:hyperlink {nsdecls("w", "r")} r:id="{r_id}">'
         f'  <w:r>'
         f'    <w:rPr>'
-        f'      <w:rStyle w:val="Hyperlink"/>'
+        f'      <w:rStyle w:val="Hyperlink"/>{extra}'
         f'    </w:rPr>'
         f'    <w:t xml:space="preserve">{_xml_escape(text)}</w:t>'
         f'  </w:r>'
@@ -370,27 +372,27 @@ def _xml_escape(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def add_formatted_runs(paragraph, text):
-    """Parse markdown inline formatting and add runs to the paragraph."""
+def add_formatted_runs(paragraph, text, bold=False, italic=False):
+    """Parse markdown inline formatting and add runs to the paragraph.
+
+    Recurses into bold/italic segments so links nested inside them
+    (e.g. a cite in a bulleted **bold** phrase) still become hyperlinks.
+    """
     for m in _INLINE_RE.finditer(text):
         if m.group(2):  # markdown link [text](url)
-            _add_hyperlink(paragraph, m.group(2), m.group(3))
+            _add_hyperlink(paragraph, m.group(2), m.group(3), bold=bold, italic=italic)
         elif m.group(4):  # bold italic
-            r = paragraph.add_run(m.group(4))
-            r.bold = True
-            r.italic = True
+            add_formatted_runs(paragraph, m.group(4), bold=True, italic=True)
         elif m.group(5):  # bold
-            r = paragraph.add_run(m.group(5))
-            r.bold = True
+            add_formatted_runs(paragraph, m.group(5), bold=True, italic=italic)
         elif m.group(6):  # italic
-            r = paragraph.add_run(m.group(6))
-            r.italic = True
-        elif m.group(7):  # plain
-            paragraph.add_run(m.group(7))
-        elif m.group(8):  # leftover asterisks
-            paragraph.add_run(m.group(8))
-        elif m.group(9):  # leftover bracket
-            paragraph.add_run(m.group(9))
+            add_formatted_runs(paragraph, m.group(6), bold=bold, italic=True)
+        else:  # plain text, leftover asterisks, or leftover bracket
+            r = paragraph.add_run(m.group(7) or m.group(8) or m.group(9))
+            if bold:
+                r.bold = True
+            if italic:
+                r.italic = True
 
 
 # ---------------------------------------------------------------------------
