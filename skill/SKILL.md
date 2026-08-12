@@ -1,6 +1,6 @@
 ---
 name: jetmemo
-version: 3.15.1
+version: 3.16.0
 description: 'Generate bench memos for the North Dakota Supreme Court from appellate case PDFs. Use when the user provides case documents (briefs, notices of appeal, orders) and asks to draft a bench memo, generate a bench memo, prepare a case summary, or analyze an appeal. Triggers: bench memo, jetmemo, jet memo, draft memo, generate memo, case analysis, prepare memo, analyze appeal, memo for oral argument.'
 ---
 
@@ -32,6 +32,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 > - splitmarks.py requires `pypdf` (`pip install pypdf`)
 > - verify_citations.py uses a bundled copy of `jetcite` (in `lib/jetcite/`); to update, run `make vendor-jetcite` from the project root
 > - `httpx` (ideally `httpx[socks]`) is optional: jetcite uses it to resolve/fetch source URLs, but imports and local `~/refs` citation scanning work without it. When httpx (or its `socksio` extra under a SOCKS proxy) is missing, network lookups degrade gracefully to search URLs — prefer MCP servers for retrieval in that case (see the **Legal-Research MCP Servers** section).
+> - `ctrack-fetch` (optional, external — a Node CLI expected on `PATH`) powers the Step 0.5 Supreme Court docket sweep. Current versions write the docket register (`{case}_docket.json`) by default (`-N/--no-docket` disables); older versions need `-D/--docket`. When the tool is absent or offline, Step 0.5 degrades per its own rules (skip + disclose in the memo); nothing else depends on it.
 
 ### ~/refs directory layout
 
@@ -167,6 +168,30 @@ This rule governs the entire pipeline below; Steps 0, 2.5, 2.6, and 5 enforce it
 6. **Subagent comparison mode (test feature, default OFF).** Scan the user's request for one of: "subagent comparison test", "model comparison test", "compare subagents", "model bakeoff", "run comparison test". If **and only if** one is present, set `comparison_mode: true` and read `${CLAUDE_SKILL_DIR}/references/model-comparison.md` — it governs how Phase 2 and Step 3.6 dispatch. Otherwise set `comparison_mode: false`, do not read that file, and run the normal pipeline. Never offer or infer this mode; it triples Phase 2 cost and is for skill development, not memo production.
 
 7. **Strength assessment mode:** Default `strength_mode: true`. Scan the user's request for suppression keywords: "neutral", "no assessment", "both sides only", "without assessment", or "no strength assessment." If found, set `strength_mode: false`. **Do not ask the user which mode they want.** When the request contains no suppression keyword, proceed directly with the strength assessment without prompting. When `strength_mode` is enabled, the memo assesses, for each issue, which side has the stronger argument and how well each position fits the text, precedent, and established interpretive principles — stated with appropriate qualifications, hedging, and an explicit confidence level (high / moderate / low), and **never** as a recommended disposition. When suppressed, the memo presents both sides' strongest positions without assessing which is stronger. In either mode, if there are close questions the memo may include suggested questions for oral argument designed to press counsel on the central strength or weakness of a position.
+
+### Step 0.5: Supreme Court Docket Sweep
+
+The working directory holds the briefs and the district court record — it does not hold the Supreme Court's own docket, where motions, single-justice orders, clerk refusals, argument waivers, and superseded briefs live. Any of those can change what record the Court may consider, what the parties' operative filings are, and what the panel must decide alongside the merits. Sweep the docket before analysis so those constraints reach Step 3 framing rather than surfacing after the memo is drafted.
+
+**Run** (requires the `ctrack-fetch` tool, ≥ the version writing the docket register by default, and network access):
+
+```bash
+ctrack-fetch -c {case_number} -a -o ndsc-docket
+```
+
+The tool writes `ndsc-docket/{case_number}_docket.json` by default — the **full register**: every docket entry with filed date, type, description, and document count, including entries with **no document**. The register is the critical output; dispositions ("Granted/Denied by Chief Justice…"), clerk refusal notices, and argument waivers are often register-only and invisible to a documents-only fetch. (On an older ctrack-fetch, pass `-D` explicitly; if `{case_number}_docket.json` does not appear after the run, the installed version predates the register feature — treat it as a degraded sweep and disclose that the register was unavailable.) `-a` downloads the entry documents (skipping service documents) into the same directory; `manifest.json` maps them to register entries by `docketId`.
+
+**Degradation:** If `ctrack-fetch` is not installed, the network is unavailable, or the case is not yet in cTrack, skip this step — but **disclose it in the memo** (one line in BACKGROUND: "The Supreme Court docket was not checked (offline/tool unavailable); motions or orders entered there are not reflected here."). Never fail the run over the sweep, and never silently omit it.
+
+**Classify the register** into five buckets (ignore service documents, fee mechanics, and routine record-transmission certificates unless they carry a constraint):
+
+1. **Record-constraining orders** — any order or notice limiting what the Court will consider: leave to file late transcripts denied, a filing stricken or received-but-not-filed, supplementation denied. These are **essential documents** (read the underlying motion, response, and order if documents exist) and must reach Step 3 *before* legal framing — a preservation or merits analysis built on excluded material is wrong, not merely incomplete. Feed them to Step 3 item 0.5 and to the memo's BACKGROUND and preservation discussions.
+2. **Pending motions — flag for resolution with the merits.** Match every `Motion`-type entry against later disposition entries (granted/denied/moot/withdrawn, by justice, Court, or clerk). **Any motion with no apparent disposition is presumptively pending, and the memo must tell the Court it will need to resolve it with the merits** — a motion to strike, a motion for judicial notice, a motion to dismiss the appeal, a motion to supplement the record, a Rule 38 fee motion, whatever it is. Matching is textual and imperfect: when no disposition entry is found, say the docket "reflects no ruling" rather than asserting none exists. These feed the dedicated Pending Motions item in Step 4 and the CONCLUSION.
+3. **Briefing history** — rejected, corrected, or superseded briefs. Rule: if any operative brief **quotes or relies on an earlier version of an opponent's filing** (e.g., an admission in a brief later rejected as noncompliant and refiled), the earlier version becomes an **essential document** — fetch and read it; the quotation cannot be verified from the operative brief alone.
+4. **Posture facts** — oral argument waived/scheduled, a party's notice of nonappearance, consolidation with another appeal, the case summary / preliminary statement of issues. These reach the memo header, ¶1, and the CONCLUSION (e.g., oral argument questions are conditional if argument was waived).
+5. **Everything else** — note and move on.
+
+**Manifest integration:** Add swept documents to the Step 0 manifest with types `sct-motion`, `sct-response`, `sct-order`, `sct-notice`, `sct-brief-superseded`, `sct-other`, and the usual `essential`/`read_status` fields. Bucket-1 orders (with their motion papers) and bucket-3 superseded briefs relied on by an operative brief are `essential: true` and pass through the Step 2.5 read gate like any other essential document.
 
 ### Step 1: Read References and Extract Text
 
@@ -736,6 +761,8 @@ It runs **here — after the Step 2.5 read gate, before Step 3 framing** — bec
 For each consolidated issue:
 
 0. **Ground the issue in the order's actual ruling.** State the district court's actual grounds of decision for this issue from Agent C2's reading of the order — enumerated, with pinpoint cites to the order (R##:page or :¶), distinguishing the primary/dispositive ground from alternative grounds. Do not characterize the ruling from the briefs. If the court decided on a threshold or dispositive ground, say so; the analysis and any strength assessment should track how the court actually disposed of the issue rather than treating every sub-question as co-equal.
+
+0.5. **Apply Supreme Court docket constraints (Step 0.5).** Before framing any issue, apply every record-constraining order from the docket sweep: if an order excludes material from consideration (late-ordered transcripts, a stricken filing), the preservation and merits analysis must run on the record *as constrained*, with the excluded material treated separately — the memo may describe what excluded material would show (it may be physically in the certified record, and the panel can revisit a single-justice order), but must label it as excluded and must not rest any preservation or merits conclusion on it without flagging the exclusion. Where the constraint guts a party's argument (e.g., testimony-based issues with the transcripts excluded), say so; where preservation survives on non-excluded sources (the parties' common account in the briefs, written filings, the order itself), rest it there. Also identify, per issue, any **pending motion** from Step 0.5 bucket 2 whose resolution interacts with the issue (a motion to strike the very material an issue relies on; a motion to dismiss that would moot the merits), and note the interaction.
 1. **Determine correct standard of review** — adjudicate between the parties' positions using Agent D's precedent analysis (if available). If both sides cite the same standard, adopt it. If they disagree, assess which is correct based on the cited authorities.
 2. **Identify the strongest argument supporting the district court's ruling** — articulate the best case for affirmance with specific citations.
 3. **Identify the strongest counterargument** — the best case for the opposing position, with specific citations.
@@ -843,7 +870,8 @@ Write the complete bench memo in markdown per `memo-format.md`:
 1. **Header** — case number, case name, oral argument date (omit if unknown), "Claude First Draft"
 2. **Quick Reference** — 4-8 key documents with record citations (from Agent A) — every one of which was read per Step 2.5
 3. **Opening [¶1]** — summarize the case and identify all issues. If `strength_mode` (default), summarize each issue's strength assessment with its confidence level (state no recommended disposition). Otherwise, state the key tension or question the case presents.
-4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues. Where a **whole claim or theory was litigated below and abandoned on appeal** (Step 2.6 Part 2) — one with no issue section to live in — note it here in a sentence, with the pinpoint where it was raised.
+4. **BACKGROUND** — factual and procedural history with record citations for every assertion. Include the district court's grounds of decision with pinpoint cites to the order; prune facts not needed to resolve the issues. Where a **whole claim or theory was litigated below and abandoned on appeal** (Step 2.6 Part 2) — one with no issue section to live in — note it here in a sentence, with the pinpoint where it was raised. Include a short **appellate procedural history** from the Step 0.5 docket sweep when it matters: record-constraining orders (with their motion/response/order cites), oral-argument waiver, superseded briefs an operative brief relies on, party nonappearance. Cite docket-only entries as "(Sup. Ct. Dkt., {date})" and swept documents by their docket entry. If the sweep was skipped, the one-line disclosure goes here.
+4.5. **PENDING MOTIONS (conditional section)** — If Step 0.5 bucket 2 found any motion the docket reflects no ruling on, add a short section (after BACKGROUND, before Issue I) listing each pending motion: movant, relief sought, response if any, and one line on how it interacts with the merits. State plainly that **the Court will need to resolve each of these with the merits** — a motion to strike, a motion for judicial notice, a motion to dismiss the appeal, a motion to supplement the record, or any other undecided motion. This is procedural housekeeping, not a disposition: describe what each motion asks and what turns on it; do not recommend how to rule. Omit the section entirely if nothing is pending.
 5. **Issue sections** — Roman numerals (I., II., III.), each with:
    - Preservation, sourced to the Step 2.6 trace with a pinpoint to the district court filing or transcript page — never to a brief page
    - Any **argument raised below but abandoned on appeal** bearing on this issue (Step 2.6 Part 2), stated in a sentence at or just before the standard of review. It belongs there because it goes to the scope of review — what the appellant has and has not brought before the Court, and whether an unchallenged ground of the district court's decision still stands
@@ -853,7 +881,7 @@ Write the complete bench memo in markdown per `memo-format.md`:
    - Sub-arguments (A, B, C) as needed
    - Analysis and assessment — tracking the court's actual grounds; where a threshold ground is dispositive, you may note that alternative grounds need not be reached rather than developing each at equal length
    - Any **supplemental authority from Step 3.6 (Agent F)** bearing on the issue, woven into the analysis and **tagged as the memo's addition** ("(not cited by the parties)")
-6. **CONCLUSION** — If `strength_mode` (default), restate each issue's strength assessment with its confidence level and the qualifications that bear on it, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without assessing which side is stronger.
+6. **CONCLUSION** — If `strength_mode` (default), restate each issue's strength assessment with its confidence level and the qualifications that bear on it, followed by any suggested questions for oral argument on close issues. Otherwise, summarize the key analytical considerations for each issue without assessing which side is stronger. If any pending motions were listed (item 4.5), restate in one sentence that they await resolution with the merits. If the docket shows oral argument was waived, present any suggested questions conditionally ("if argument is ordered").
 
 ### Step 5: Self-Review
 
@@ -887,6 +915,9 @@ Review the memo against this checklist before presenting:
 - [ ] Citation formats are correct (see style-spec.md)
 - [ ] Record citations include pinpoint pages where available
 - [ ] If Agent D ran: its Lookup Methods Summary is reported to the user (and carried into the Step 9 appendix when verification runs), with any ND web fallback explained
+- [ ] **Supreme Court docket swept (Step 0.5) or its absence disclosed** — the memo reflects the register, not just the working-directory documents; if the sweep was skipped, BACKGROUND says so in one line
+- [ ] **No analysis relies on material a Supreme Court order excludes without flagging the exclusion** — every record-constraining order from the sweep is stated, and preservation/merits conclusions rest on non-excluded sources or are expressly qualified
+- [ ] **Every motion the docket reflects no ruling on is listed as pending for resolution with the merits** (Step 4 item 4.5) — motions to strike, for judicial notice, to dismiss, to supplement, or any other undecided motion — or the memo has no pending-motions section because none is pending
 
 Fix any issues found before presenting the memo to the user.
 
