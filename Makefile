@@ -5,10 +5,12 @@ JETCITE_SRC := ../jetcite/src/jetcite
 JETCITE_DEST := skill/lib/jetcite
 SPLITMARKS_SRC := ../splitmarks/splitmarks.py
 SPLITMARKS_DEST := skill/scripts/splitmarks.py
+TEXTQUALITY_SRC := ../splitmarks/textquality.py
+TEXTQUALITY_DEST := skill/scripts/textquality.py
 CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
 CITESTYLE_DEST := skill/references/nd-citation-style.md
 
-.PHONY: package clean install test release vendor-jetcite vendor-splitmarks vendor-citestyle drift-check version-check
+.PHONY: package clean install test release vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
 
 package: clean
 	mkdir -p $(SKILL_NAME)-skill
@@ -46,10 +48,23 @@ vendor-jetcite:
 	find $(JETCITE_DEST) -type d -name __pycache__ -exec rm -rf {} +  2>/dev/null || true
 	@echo "Vendored jetcite from $(JETCITE_SRC)"
 
-vendor-splitmarks:
+# Depends on vendor-textquality because splitmarks imports textquality inside a
+# try/except: vendoring the script without the module leaves --check-text
+# silently back on the old density-only behaviour, which is the exact failure
+# this pairing exists to prevent. The two always move together.
+vendor-splitmarks: vendor-textquality
 	@test -f $(SPLITMARKS_SRC) || (echo "FAIL: splitmarks source not found at $(SPLITMARKS_SRC)" && exit 1)
 	cp $(SPLITMARKS_SRC) $(SPLITMARKS_DEST)
 	@echo "Vendored splitmarks from $(SPLITMARKS_SRC)"
+
+# Text-layer quality scorer that splitmarks --check-text consults to tell a
+# corrupt text layer (dense but garbage) from a missing one. Canonical copy
+# lives in the splitmarks repo beside the script that imports it; it must land
+# in the same directory as splitmarks.py for that import to resolve.
+vendor-textquality:
+	@test -f $(TEXTQUALITY_SRC) || (echo "FAIL: textquality source not found at $(TEXTQUALITY_SRC)" && exit 1)
+	cp $(TEXTQUALITY_SRC) $(TEXTQUALITY_DEST)
+	@echo "Vendored textquality from $(TEXTQUALITY_SRC)"
 
 # The ND Supreme Court's Redbook supplement. Canonical copy lives in the jetcite
 # repo so jetmemo, jetredline, and jetrehearing cite one identical rule set.
@@ -66,6 +81,12 @@ drift-check:
 	  echo "splitmarks: in sync with canonical."; \
 	else \
 	  echo "splitmarks: canonical repo not present ($(SPLITMARKS_SRC)); skipping drift check."; \
+	fi
+	@if [ -f $(TEXTQUALITY_SRC) ]; then \
+	  cmp -s $(TEXTQUALITY_SRC) $(TEXTQUALITY_DEST) || { echo "DRIFT: $(TEXTQUALITY_DEST) differs from canonical $(TEXTQUALITY_SRC) — run 'make vendor-textquality'"; exit 1; }; \
+	  echo "textquality: in sync with canonical."; \
+	else \
+	  echo "textquality: canonical repo not present ($(TEXTQUALITY_SRC)); skipping drift check."; \
 	fi
 	@if [ -f $(CITESTYLE_SRC) ]; then \
 	  cmp -s $(CITESTYLE_SRC) $(CITESTYLE_DEST) || { echo "DRIFT: $(CITESTYLE_DEST) differs from canonical $(CITESTYLE_SRC) — run 'make vendor-citestyle'"; exit 1; }; \
@@ -86,6 +107,7 @@ test: drift-check version-check
 	@test -d skill/references || (echo "FAIL: skill/references/ missing" && exit 1)
 	@test -d skill/scripts || (echo "FAIL: skill/scripts/ missing" && exit 1)
 	@test -f skill/scripts/splitmarks.py || (echo "FAIL: skill/scripts/splitmarks.py missing" && exit 1)
+	@test -f skill/scripts/textquality.py || (echo "FAIL: skill/scripts/textquality.py missing — run 'make vendor-textquality'" && exit 1)
 	@test -d skill/lib/jetcite || (echo "FAIL: skill/lib/jetcite/ missing — run 'make vendor-jetcite'" && exit 1)
 	@test -f install.py || (echo "FAIL: install.py missing" && exit 1)
 	@test -f README.md || (echo "FAIL: README.md missing" && exit 1)

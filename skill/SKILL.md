@@ -136,13 +136,29 @@ This rule governs the entire pipeline below; Steps 0, 2.5, 2.6, and 5 enforce it
    python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf -o .split_records --no-clobber -v --check-text  # first pass
    ```
 
-   `--check-text` runs `pdftotext` over each output file and prints
-   `WARNING: <file> ... appears image-scanned` to stderr for anything under
-   ~50 chars/page. **Read those warnings** — they name, up front, exactly which
-   record items need the visual read the Essential-Documents Rule requires
+   `--check-text` runs `pdftotext` over each output file and warns on stderr in
+   two distinct cases. **Read those warnings** — they name, up front, exactly
+   which record items need the visual read the Essential-Documents Rule requires
    below, instead of an agent discovering it after loading the file and getting
-   nothing. The flag needs `pdftotext` on `PATH`; without poppler it degrades
-   to "can't check," so its silence is not proof of a text layer.
+   nothing.
+
+   | Warning | What it means | What to do |
+   |---|---|---|
+   | `appears image-scanned (avg N chars/page)` | Under ~50 chars/page — no usable text layer | Mark `needs_visual_read`; `ocrmypdf --skip-text` if you OCR it |
+   | `has a text layer that is present but CORRUPT` | Dense text, but it scores as unreliable OCR | Mark `needs_visual_read`; **`ocrmypdf --force-ocr`** — `--skip-text` is a silent no-op here |
+
+   The second case is the dangerous one and the reason not to trust a character
+   count alone: a scan can yield 60 chars/page of confident nonsense
+   ("the assessmellt thereof shall Le suberdmate to the gelleral plall"), which
+   an agent will read and quote as if it were the record. Treat a CORRUPT
+   warning as at least as serious as an image-only one — never as "text is
+   present, proceed."
+
+   The flag needs `pdftotext` on `PATH`; without poppler it degrades to "can't
+   check," so its silence is not proof of a text layer. Corrupt-layer detection
+   additionally needs `scripts/textquality.py` beside `splitmarks.py` (both are
+   bundled); without it the check falls back to the density test alone and the
+   second row above will never fire.
 
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 

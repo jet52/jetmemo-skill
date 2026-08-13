@@ -104,7 +104,7 @@ jetmemo-skill/
 └── skill/
     ├── SKILL.md
     ├── lib/
-    │   └── jetcite/          ← bundled citation library (v2.10.1)
+    │   └── jetcite/          ← bundled citation library (v2.10.3)
     │       ├── models.py     ← citation data models
     │       ├── scanner.py    ← regex-based citation extraction
     │       ├── resolver.py   ← URL resolution engine
@@ -122,7 +122,8 @@ jetmemo-skill/
         ├── extract_text.py   ← multi-library PDF text extraction
         ├── link_citations.py
         ├── memo_to_docx.py
-        ├── splitmarks.py
+        ├── splitmarks.py     ← record-packet splitter (v2.2.0)
+        ├── textquality.py    ← text-layer scorer behind `--check-text`
         └── verify_citations.py
 ```
 
@@ -198,13 +199,15 @@ folder picker is auto-detected and symlinked at startup.
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
 | pypdf | PDF text extraction and packet splitting | Required |
-| [jetcite](https://github.com/jet52/jetcite) v2.10.1 | Citation extraction and URL resolution | Bundled |
+| [jetcite](https://github.com/jet52/jetcite) v2.10.3 | Citation extraction and URL resolution | Bundled |
 | [ndlaw-mcp](https://github.com/jet52/ndlaw-mcp) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
 | [CourtListener MCP](https://www.courtlistener.com/) | Non-ND case law | Recommended |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 | [jetredline](https://github.com/jet52/jetredline) v4.4.0+ | Memo audit (style, consistency, fact/brief coverage) | Optional |
 
 **jetcite** is bundled in `skill/lib/jetcite/`. To update to the latest version, clone the [jetcite repo](https://github.com/jet52/jetcite) alongside this one and run `make vendor-jetcite`.
+
+**splitmarks** and **textquality** are bundled in `skill/scripts/`. Both come from the [splitmarks repo](https://github.com/jet52/splitmarks); clone it alongside this one and run `make vendor-splitmarks`, which vendors the pair. They must stay together — `splitmarks --check-text` imports `textquality` to tell a text layer that is *missing* from one that is *present but garbage*, and without the module beside it the check silently falls back to counting characters, which cannot see the second case. `make test` fails if either has drifted from canonical.
 
 **jetpanel** provides multi-perspective legal analysis from competing jurisprudential methodologies. When both skills are installed, jetmemo automatically invokes jetpanel for close interpretive questions (now the default; suppressed only in neutral mode). Install it separately from the [jetpanel repo](https://github.com/jet52/jetpanel).
 
