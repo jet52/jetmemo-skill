@@ -10,7 +10,7 @@ TEXTQUALITY_DEST := skill/scripts/textquality.py
 CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
 CITESTYLE_DEST := skill/references/nd-citation-style.md
 
-.PHONY: package clean install test release vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
+.PHONY: package clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
 
 package: clean
 	mkdir -p $(SKILL_NAME)-skill
@@ -39,7 +39,30 @@ release: version-check package
 	git push origin main && \
 	git push origin "v$$VERSION" && \
 	gh release create "v$$VERSION" $(ZIP_NAME) --title "v$$VERSION" --generate-notes && \
+	$(MAKE) --no-print-directory check-assets TAG="v$$VERSION" ASSETS="$(ZIP_NAME)" && \
 	echo "Released v$$VERSION"
+
+# `gh release create` has been observed to exit 0 after silently skipping an
+# asset: jetredline v4.19.1 was handed three zips, attached two, and reported
+# success, so `make release` announced a release that was missing the file
+# manual installers download. Nothing in the toolchain caught it. This asserts
+# every expected asset actually landed, retries once, then fails hard — a
+# release that cannot prove its assets is a failed release.
+check-assets:
+	@test -n "$(TAG)" || { echo "check-assets: TAG not set"; exit 1; }
+	@for f in $(ASSETS); do \
+	  if ! gh release view "$(TAG)" --json assets --jq '.assets[].name' | grep -qx "$$f"; then \
+	    echo "MISSING: $$f did not attach to $(TAG); retrying upload"; \
+	    gh release upload "$(TAG)" "$$f" --clobber || true; \
+	  fi; \
+	done
+	@missing=0; \
+	for f in $(ASSETS); do \
+	  gh release view "$(TAG)" --json assets --jq '.assets[].name' | grep -qx "$$f" || \
+	    { echo "FAIL: $$f is still not attached to $(TAG)"; missing=1; }; \
+	done; \
+	[ $$missing -eq 0 ] || exit 1; \
+	echo "assets verified on $(TAG): $(ASSETS)"
 
 vendor-jetcite:
 	@test -d $(JETCITE_SRC) || (echo "FAIL: jetcite source not found at $(JETCITE_SRC)" && exit 1)
