@@ -39,6 +39,27 @@ how any case should or will be decided. It is not legal advice.
 
 ## Installation
 
+### As a plugin (Claude Cowork) — recommended
+
+Most users install jetmemo as a plugin. Two ways:
+
+**From the jet-hub marketplace**, which keeps it current automatically:
+
+```
+/plugin marketplace add jet52/jet-hub
+/plugin install jetmemo@jet-hub
+```
+
+**By direct upload**, if you are not using the marketplace: download
+`jetmemo-plugin-v<version>.zip` from the
+[latest release](https://github.com/jet52/jetmemo-skill/releases/latest) and add
+it in Cowork under **Customize → Plugins**.
+
+> **Take the `-plugin-` archive, not `-skill-`.** The plugin archive carries the
+> manifest that makes Cowork install it as a plugin. The `-skill-` archive is the
+> standalone installer bundle used below; uploaded as a plugin it has no
+> manifest, which is the usual cause of "it installed but nothing happens."
+
 ### Claude Code (CLI)
 
 **Option A: From .zip**

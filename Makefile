@@ -1,6 +1,7 @@
 SKILL_NAME := jetmemo
 VERSION := $(shell cat VERSION)
 ZIP_NAME := $(SKILL_NAME)-skill-v$(VERSION).zip
+PLUGIN_ZIP := $(SKILL_NAME)-plugin-v$(VERSION).zip
 JETCITE_SRC := ../jetcite/src/jetcite
 JETCITE_DEST := skill/lib/jetcite
 SPLITMARKS_SRC := ../splitmarks/splitmarks.py
@@ -10,15 +11,41 @@ TEXTQUALITY_DEST := skill/scripts/textquality.py
 CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
 CITESTYLE_DEST := skill/references/nd-citation-style.md
 
-.PHONY: package clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
+.PHONY: package package-plugin package-all clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
+.PHONY: build-skill build-plugin
 
-package: clean
+# Public targets clean first, then delegate. package-all cleans once so the
+# two build recipes cannot clobber each other's output.
+#
+# The clean matters: `zip -r` ADDS to an existing archive rather than replacing
+# it, so building over a stale zip keeps every file any earlier build put
+# there. jetbriefcheck shipped exactly that bug — its archive had quietly
+# accumulated repo-root files that were never part of the skill.
+package: clean build-skill
+package-plugin: clean build-plugin
+package-all: clean build-skill build-plugin
+
+# Standalone installer bundle: jetmemo-skill/ at the archive root, carrying the
+# skill tree plus install.py/install.sh for a manual drop into ~/.claude/skills/.
+build-skill:
 	mkdir -p $(SKILL_NAME)-skill
 	cp -r skill/ install.py install.sh README.md VERSION $(SKILL_NAME)-skill/
 	cd $(SKILL_NAME)-skill && rm -rf .venv node_modules package-lock.json __pycache__ TODO.md
 	find $(SKILL_NAME)-skill -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	zip -r $(ZIP_NAME) $(SKILL_NAME)-skill/
 	rm -rf $(SKILL_NAME)-skill
+
+# Plugin archive for Cowork ("Customize -> Plugins") and marketplace upload.
+#
+# Shape is dictated by the manifest, not by taste: plugin.json declares
+# "skills": "./skill", so the archive must carry .claude-plugin/plugin.json at
+# its root and the skill tree at exactly that relative path. The installer
+# bundle above is NOT interchangeable — it nests everything under
+# jetmemo-skill/ and ships no manifest, so Cowork reads it as a bare skill.
+build-plugin:
+	zip -r $(PLUGIN_ZIP) .claude-plugin/plugin.json skill/ \
+		-x "skill/.venv/*" "skill/node_modules/*" \
+		   "skill/package-lock.json" "*/__pycache__/*" "*.pyc"
 
 # The version lives in three places that must agree: VERSION (canonical, drives
 # the zip name and the release tag), the plugin manifest, and the SKILL.md
@@ -33,13 +60,13 @@ version-check:
 	fi; \
 	echo "version: $$V consistent across VERSION, plugin.json, SKILL.md."
 
-release: version-check package
+release: version-check package-all
 	@VERSION=$$(cat VERSION) && \
 	git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
 	git push origin main && \
 	git push origin "v$$VERSION" && \
-	gh release create "v$$VERSION" $(ZIP_NAME) --title "v$$VERSION" --generate-notes && \
-	$(MAKE) --no-print-directory check-assets TAG="v$$VERSION" ASSETS="$(ZIP_NAME)" && \
+	gh release create "v$$VERSION" $(PLUGIN_ZIP) $(ZIP_NAME) --title "v$$VERSION" --generate-notes && \
+	$(MAKE) --no-print-directory check-assets TAG="v$$VERSION" ASSETS="$(PLUGIN_ZIP) $(ZIP_NAME)" && \
 	echo "Released v$$VERSION"
 
 # `gh release create` has been observed to exit 0 after silently skipping an
@@ -119,7 +146,8 @@ drift-check:
 	fi
 
 clean:
-	rm -f $(SKILL_NAME)-skill*.zip
+	rm -f $(SKILL_NAME)-skill*.zip $(SKILL_NAME)-plugin*.zip
+	rm -rf $(SKILL_NAME)-skill
 
 install:
 	python3 install.py
