@@ -118,11 +118,11 @@ Stdlib only — system `python3`, ahead of the refs setup and the update check. 
 
 **On `warn`, ask with `AskUserQuestion`.** Do not pose it rhetorically and proceed.
 
-- **Question:** "jetmemo is running on `<model>`. Its reliability testing is based on Opus-class models, and this pipeline delegates all of its reading to subagents that inherit this model — a weaker reader's miss will not surface anywhere downstream. Run anyway?"
+- **Question:** "jetmemo is running on `<model>`. We strongly recommend Opus for this work — reliability testing is based on Opus-class models, and this pipeline delegates all of its reading to subagents that inherit your model, so a weaker reader's miss will not surface anywhere downstream. How would you like to proceed?"
 - **Header:** "Model"
 - **Options:**
-  1. **Stop — switch to Opus** — End here, having done no work. Tell the user to run `/model opus` (or restart with `claude --model opus`) and re-invoke jetmemo.
-  2. **Proceed on `<model>`** — Run the full pipeline on the current model, with the reduced-reliability caveat recorded in the memo.
+  1. **Switch to Opus (recommended)** — End here, having done no work. Tell the user to run `/model opus` (or restart with `claude --model opus`) and re-invoke jetmemo.
+  2. **Continue on `<model>`** — Run the full pipeline now, with the reduced-reliability caveat recorded in the memo. **Supported, not a defect:** Opus is not on every plan, and a memo from this model is still worth having — it simply carries a higher miss rate, which the memo will say.
 
 If the user proceeds, carry it forward in exactly two places: say it once when you announce the run, and add this line to the memo immediately above the provenance footer (Step 10), so a reader who never saw the prompt still sees it:
 
