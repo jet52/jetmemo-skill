@@ -10,8 +10,10 @@ TEXTQUALITY_SRC := ../splitmarks/textquality.py
 TEXTQUALITY_DEST := skill/scripts/textquality.py
 CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
 CITESTYLE_DEST := skill/references/nd-citation-style.md
+CHECKMODEL_SRC := ../jetredline/skills/jetredline/check_model.py
+CHECKMODEL_DEST := skill/scripts/check_model.py
 
-.PHONY: package package-plugin package-all clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle drift-check version-check
+.PHONY: package package-plugin package-all clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle vendor-checkmodel drift-check version-check
 .PHONY: build-skill build-plugin
 
 # Public targets clean first, then delegate. package-all cleans once so the
@@ -123,6 +125,14 @@ vendor-citestyle:
 	cp $(CITESTYLE_SRC) $(CITESTYLE_DEST)
 	@echo "Vendored nd-citation-style.md from $(CITESTYLE_SRC)"
 
+# The Opus-class model gate. Canonical copy lives in jetredline; every string
+# in it is skill-agnostic so the copies stay byte-identical, which is what lets
+# jetredline's test suite stand as this one's coverage too.
+vendor-checkmodel:
+	@test -f $(CHECKMODEL_SRC) || (echo "FAIL: check_model source not found at $(CHECKMODEL_SRC)" && exit 1)
+	cp $(CHECKMODEL_SRC) $(CHECKMODEL_DEST)
+	@echo "Vendored check_model.py from $(CHECKMODEL_SRC)"
+
 # Fail if a vendored copy has drifted from its canonical source repo.
 # Tolerant of canonical being absent (e.g. on an install-only machine).
 drift-check:
@@ -144,6 +154,12 @@ drift-check:
 	else \
 	  echo "nd-citation-style: canonical repo not present ($(CITESTYLE_SRC)); skipping drift check."; \
 	fi
+	@if [ -f $(CHECKMODEL_SRC) ]; then \
+	  cmp -s $(CHECKMODEL_SRC) $(CHECKMODEL_DEST) || { echo "DRIFT: $(CHECKMODEL_DEST) differs from canonical $(CHECKMODEL_SRC) — run 'make vendor-checkmodel'"; exit 1; }; \
+	  echo "check_model: in sync with canonical."; \
+	else \
+	  echo "check_model: canonical repo not present ($(CHECKMODEL_SRC)); skipping drift check."; \
+	fi
 
 clean:
 	rm -f $(SKILL_NAME)-skill*.zip $(SKILL_NAME)-plugin*.zip
@@ -159,6 +175,7 @@ test: drift-check version-check
 	@test -d skill/scripts || (echo "FAIL: skill/scripts/ missing" && exit 1)
 	@test -f skill/scripts/splitmarks.py || (echo "FAIL: skill/scripts/splitmarks.py missing" && exit 1)
 	@test -f skill/scripts/textquality.py || (echo "FAIL: skill/scripts/textquality.py missing — run 'make vendor-textquality'" && exit 1)
+	@test -f skill/scripts/check_model.py || (echo "FAIL: skill/scripts/check_model.py missing — run 'make vendor-checkmodel'" && exit 1)
 	@test -d skill/lib/jetcite || (echo "FAIL: skill/lib/jetcite/ missing — run 'make vendor-jetcite'" && exit 1)
 	@test -f install.py || (echo "FAIL: install.py missing" && exit 1)
 	@test -f README.md || (echo "FAIL: README.md missing" && exit 1)

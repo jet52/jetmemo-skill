@@ -22,6 +22,7 @@ how any case should or will be decided. It is not legal advice.
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) installed
+- An **Opus-class model** (Opus, Fable, or Mythos). jetmemo checks at startup and asks you to confirm before running on Sonnet or Haiku — the pipeline delegates all of its reading to subagents that inherit your model, so a weaker reader's miss surfaces nowhere downstream. Switch with `/model opus`.
 - `pypdf` — PDF processing library (`pip install pypdf`)
 - An MCP legal-research source (see [Legal Research Sources](#legal-research-sources) below) — not strictly required, but citation verification is much weaker without one
 
@@ -138,11 +139,14 @@ jetmemo-skill/
     │   ├── nd-citation-style.md
     │   └── style-spec.md
     └── scripts/
+        ├── check_model.py    ← Opus-class model gate (Step 0.0)
         ├── check_update.py
+        ├── compare_agents.py
         ├── ensure_refs.py    ← auto-detects Cowork mounted refs
         ├── extract_text.py   ← multi-library PDF text extraction
         ├── link_citations.py
         ├── memo_to_docx.py
+        ├── provenance.py     ← model/version/date stamp on the finished memo
         ├── splitmarks.py     ← record-packet splitter (v2.2.0)
         ├── textquality.py    ← text-layer scorer behind `--check-text`
         └── verify_citations.py
