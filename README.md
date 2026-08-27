@@ -173,8 +173,8 @@ Two ways to connect:
 
 | | Endpoint | Notes |
 |---|---|---|
-| **Self-hosted** (recommended) | [`ndlaw-mcp`](https://github.com/jet52/ndlaw-mcp) over stdio | Per-call latency in single-digit milliseconds against roughly 100–250 ms for the remote, and it works with no network at all — which is what makes it usable in sandboxes that block outbound HTTP. |
-| **Hosted** | `https://ndlaw.org/mcp` | Nothing to install. Add it as a remote MCP connector. |
+| **Hosted** (recommended) | [`https://ndlaw.org/mcp`](https://ndlaw.org) | Nothing to install. Add it as a remote MCP connector — free, no account required. |
+| **Self-hosted** | the `ndlaw` server over stdio | Per-call latency in single-digit milliseconds against roughly 100–250 ms for the remote, and it works with no network at all — which is what makes it usable in sandboxes that block outbound HTTP. Not currently distributed publicly. |
 
 Either way the skill finds the tools by *name*, not by namespace prefix, so it works
 whether they arrive as `mcp__ndlaw__*`, `mcp__claude_ai_ndlaw__*`, or anything else
@@ -225,7 +225,7 @@ folder picker is auto-detected and symlinked at startup.
 |-----------|---------|-----------|
 | pypdf | PDF text extraction and packet splitting | Required |
 | [jetcite](https://github.com/jet52/jetcite) v2.10.3 | Citation extraction and URL resolution | Bundled |
-| [ndlaw-mcp](https://github.com/jet52/ndlaw-mcp) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
+| [ndlaw](https://ndlaw.org) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
 | [CourtListener MCP](https://www.courtlistener.com/) | Non-ND case law | Recommended |
 | [jetpanel](https://github.com/jet52/jetpanel) | Multi-perspective interpretive analysis | Optional |
 | [jetredline](https://github.com/jet52/jetredline) v4.4.0+ | Memo audit (style, consistency, fact/brief coverage) | Optional |
