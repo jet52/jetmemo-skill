@@ -130,7 +130,7 @@ All citations — case law, record, statutory — should be as precise as possib
 - **Record citations:** Always include pinpoint page when available: `(R45:12)` not just `(R45)`. Include paragraph when citing a specific finding: `(R45:12:¶15)`.
 - **Case citations:** Always include pinpoint paragraph: `2024 ND 156, ¶ 12` not just `2024 ND 156`.
 - **Short identifying quotes:** When a fact or holding could be ambiguous, include a short quote (≤ 15 words) to anchor the citation: `The district court found "no credible evidence of changed circumstances." (R36:4)`.
-- **Brief page citations:** When attributing an argument to a party, cite the brief page: `Appellant argues the statute is ambiguous. (Ap't Br. at 14.)` Use the format `(Ap't Br. at ##)` or `(Ap'e Br. at ##)`.
+- **Brief citations:** When attributing an argument to a party, cite the brief — page and paragraph: `Appellant argues the statute is ambiguous (At. Br. 1, ¶ 2).` The form is defined in `nd-citation-style.md` under "Citations to briefs."
 
 ## Tone and Voice
 
@@ -160,14 +160,4 @@ Common standards in ND appellate practice — use the one cited in the briefs:
 
 ## Author Preferences
 
-These override Redbook and Bluebook defaults per the citation authority hierarchy (item 2).
-
-### Brief Citation Abbreviations
-
-| Full Form | Abbreviation |
-|-----------|-------------|
-| Appellant's Brief | Ap't Br. |
-| Appellee's Brief | Ap'e Br. |
-| Reply Brief | Reply Br. |
-
-Use these abbreviated forms in all parenthetical citations: `(Ap't Br. at 14.)`, `(Ap'e Br. at 7.)`. In running text, the full form may be used on first reference if needed for clarity.
+These override Redbook and Bluebook defaults per the citation authority hierarchy (item 2). They are collected in `nd-citation-style.md`, which governs citation form throughout — including the shorthand titles and pin-cite form for briefs (`At. Br. 1, ¶ 2`).
