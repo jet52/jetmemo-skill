@@ -29,7 +29,7 @@ Generate bench memos for ND Supreme Court oral arguments from appellate case PDF
 | Comparison metrics     | `${CLAUDE_SKILL_DIR}/scripts/compare_agents.py`   |
 
 > **Dependencies:**
-> - splitmarks.py requires `pypdf` (`pip install pypdf`)
+> - **Python packages come from the skill's own venv**, built by `bootstrap_env.py` from `requirements.txt` (Step 0, **Python environment**): `pypdf`, `pdfplumber`, `python-docx`, `beautifulsoup4`, `click`, `httpx[socks]`, `markdownify`. Do not `pip install` them system-wide and do not improvise a substitute interpreter (`uv run --with …`, another project's venv): the venv is keyed to this skill's version, so every run uses the same packages.
 > - verify_citations.py uses a bundled copy of `jetcite` (in `lib/jetcite/`); to update, run `make vendor-jetcite` from the project root
 > - `httpx` (ideally `httpx[socks]`) is optional: jetcite uses it to resolve/fetch source URLs, but imports and local `~/refs` citation scanning work without it. When httpx (or its `socksio` extra under a SOCKS proxy) is missing, network lookups degrade gracefully to search URLs — prefer MCP servers for retrieval in that case (see the **Legal-Research MCP Servers** section).
 > - `ctrack-fetch` (optional, external — a Node CLI expected on `PATH`) powers the Step 0.5 Supreme Court docket sweep. Current versions write the docket register (`{case}_docket.json`) by default (`-N/--no-docket` disables); older versions need `-D/--docket`. When the tool is absent or offline, Step 0.5 degrades per its own rules (skip + disclose in the memo); nothing else depends on it.
@@ -140,6 +140,23 @@ Do not repeat the warning in every issue or in every agent's output. Note that S
 
 **Update check:** Run `python3 "${CLAUDE_SKILL_DIR}/scripts/check_update.py"` silently. If it prints output, include it as a note to the user.
 
+**Python environment:** Run once, with system `python3`:
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/bootstrap_env.py"
+```
+
+It finds or builds this skill's virtual environment and prints one line, `VENV_PYTHON=<absolute path>`. **Capture that path as a literal string** and use it wherever this document writes `$VENV_PYTHON`, which is every script below except the stdlib-only ones (`check_model.py`, `ensure_refs.py`, `check_update.py`, `provenance.py`, `compare_agents.py`, which stay on `python3`). Substitute the literal path into the command; do not rely on a shell variable, which does not survive between tool calls. The venv lives in a prebuilt `skill/.venv` if one exists, else `~/.cache/jet-skills/jetmemo/<version>/venv` (built on first use, about 10 seconds, needs network), else the system temp dir (read-only home, e.g. Cowork). It is cheap after the first run. Never create a venv in the working directory.
+
+If it exits 1 (no writable location, or no network for the first build), create one by hand and use its python the same way:
+
+```bash
+python3 -m venv /tmp/jetmemo-venv
+/tmp/jetmemo-venv/bin/pip install -r "${CLAUDE_SKILL_DIR}/requirements.txt" -q
+```
+
+**Pass the path to subagents.** Any subagent that runs one of this skill's scripts (a targeted extraction, a split, a citation pass) gets the literal `VENV_PYTHON` path in its prompt, with the instruction to use it in place of `python3`.
+
 1. **Scan** the working directory for `.pdf` files.
 
 2. **Classify** each PDF — read just the first 2 pages (use the Read tool on the PDF) to determine document type:
@@ -168,8 +185,8 @@ Do not repeat the warning in every issue or in every agent's output. Note that S
    For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf --dry-run -vv   # preview bookmark tree
-   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf -o .split_records --no-clobber -v --check-text  # first pass
+   $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf --dry-run -vv   # preview bookmark tree
+   $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" record.pdf -o .split_records --no-clobber -v --check-text  # first pass
    ```
 
    `--check-text` runs `pdftotext` over each output file and warns on stderr in
@@ -199,8 +216,8 @@ Do not repeat the warning in every issue or in every agent's output. Note that S
    After the first pass, check if any output file is still large (>30 pages) and has sub-bookmarks. If so, run `splitmarks` again on that file:
 
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
-   python "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v --check-text  # split again
+   $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf --dry-run -vv   # check for sub-bookmarks
+   $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/splitmarks.py" .split_records/R.Cited.pdf -o .split_records/cited --no-clobber -v --check-text  # split again
    ```
 
    Repeat until every output file is a single record item or has no further bookmarks. Then classify all resulting split files the same way.
@@ -255,7 +272,7 @@ The tool writes `ndsc-docket/{case_number}_docket.json` by default — the **ful
 2. **Extract text** from all PDFs using the smart extraction script, which tries multiple PDF libraries in priority order and picks the best result:
 
    ```bash
-   python3 "${CLAUDE_SKILL_DIR}/scripts/extract_text.py" <file1>.pdf <file2>.pdf ...
+   $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/extract_text.py" <file1>.pdf <file2>.pdf ...
    ```
 
    The script tries extractors in this order: `pdftotext` (Poppler) → `pypdf` → `PyMuPDF` → `pdfplumber` → `marker`. Each page is scored individually. It stops as soon as one extractor produces good output (≥ 70% of text-bearing pages score ≥ 5 words/line). If only marginal output is found, it uses the best available. The script writes two files per PDF:
@@ -272,7 +289,7 @@ The tool writes `ndsc-docket/{case_number}_docket.json` by default — the **ful
 4. **Extract citation list:** Run the citation checker on all `.txt` files to build a structured citation list. This determines which conditional agents to launch.
 
    ```bash
-   cat *.txt | python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --refs-dir ~/refs --json --cache > citations.json
+   cat *.txt | $VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --refs-dir ~/refs --json --cache > citations.json
    ```
 
    `--cache` fetches web-only **case** citations into `~/refs` (opinions are permanent content — cached once, read locally forever after), so Agent D reads local markdown instead of fetching at runtime, and each memo run grows the cache for the next. Pre-populated statute/rule content is never overwritten. Fetch failures are logged to stderr and the entry stays web-only — the scan never fails because a fetch did. If the network is unavailable, drop the flag.
@@ -341,6 +358,7 @@ Launch all applicable agents **simultaneously** using the Task tool (`subagent_t
 - Paths to relevant `.txt` files (or PDF paths if `needs_visual_read`)
 - Focused extraction instructions
 - Expected output format (structured markdown)
+- The literal `VENV_PYTHON` path, if the agent may run any of this skill's scripts (see Step 0, **Python environment**)
 
 **For Agents D and E** (and any agent doing citation or authority lookups), also **copy the "Legal-Research MCP Servers" section above into the agent's prompt** — including the namespace note, so the subagent matches tool *names* rather than a hard-coded prefix. The subagent does not read this SKILL, so it needs the source precedence and tool signatures inline to prefer the MCP over the web.
 
@@ -1054,7 +1072,7 @@ Hyperlink citations to authority in the memo markdown. This converts bare citati
 
 ```bash
 # Generate memo-derived citation list
-python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs --json > memo_citations.json
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs --json > memo_citations.json
 
 # Merge brief + memo citations (de-dup by cite_text, prefer entries with URLs)
 python3 -c "
@@ -1071,7 +1089,7 @@ json.dump(list(merged.values()), open('merged_citations.json','w'), indent=2)
 "
 
 # Link with the enriched set
-python3 "${CLAUDE_SKILL_DIR}/scripts/link_citations.py" {memo_file} merged_citations.json
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/link_citations.py" {memo_file} merged_citations.json
 ```
 
 `link_citations.py` (version ≥ 2) automatically derives short-form aliases:
@@ -1087,12 +1105,12 @@ Citations already inside markdown links are left untouched. If `citations.json` 
 Convert the markdown memo to a formatted .docx file matching the Court's bench memo template (QTPalatine 13pt, justified, 1.2 line spacing):
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
 ```
 
 This produces `{case_number}_memo.docx` alongside the markdown file. The docx uses the same styles as the Court's bench memos: Title, Address Block (with tab-aligned metadata), Heading 1 (centered section heads), Heading 2 (issue headings), Heading 3 (sub-arguments), and Main Body Text. Page numbers appear in the footer.
 
-If python-docx is not installed, the script will print an error. Install with `pip install python-docx`.
+`python-docx` comes from the skill venv (Step 0, **Python environment**). If the script reports it missing, re-run `bootstrap_env.py` rather than installing it system-wide.
 
 > **Regenerate after later edits.** Steps 9 (verification append) and 10 (provenance footer) modify the markdown after this point. Re-run `memo_to_docx.py` as the **final** action so the `.docx` reflects them — Step 10 does this for you.
 
@@ -1105,7 +1123,7 @@ To decide which case you are in, diff the memo's citations against the brief-der
 Run the citation checker on the finished memo:
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/verify_citations.py" --file {memo_file} --refs-dir ~/refs
 ```
 
 The human-readable output shows total citations found, how many resolve locally vs. web-only vs. unresolved, grouped by type.
@@ -1139,7 +1157,7 @@ Stamp a provenance footer onto the finished memo so the report carries a reprodu
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/provenance.py" --file {memo_file} --subagents
-python3 "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/memo_to_docx.py" {memo_file}
 ```
 
 The footer reads, e.g.: *Report generated by Claude Opus 4.8 (claude-opus-4-8) using jetmemo v3.7.0 on 2026-06-05. AI-generated first draft for internal use; verify all citations and findings before relying.*

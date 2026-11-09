@@ -1,0 +1,17 @@
+# Runtime dependencies for jetmemo's scripts, installed into the skill's own
+# venv by bootstrap_env.py (see SKILL.md "Python environment"). Never install
+# these system-wide for jetmemo. Keep comments on their own lines:
+# bootstrap_env.py's import check does not strip inline comments.
+#
+# jetcite (bundled in lib/jetcite): source parsers, CLI, URL resolution
+# (socks extra for Cowork's proxy), source cleanup
+beautifulsoup4
+click
+httpx[socks]
+markdownify
+# extract_text.py fallback extractor
+pdfplumber
+# splitmarks.py, extract_text.py, textquality.py
+pypdf
+# memo_to_docx.py
+python-docx

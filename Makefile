@@ -12,8 +12,10 @@ CITESTYLE_SRC := ../jetcite/reference/nd-citation-style.md
 CITESTYLE_DEST := skill/references/nd-citation-style.md
 CHECKMODEL_SRC := ../jetredline/skills/jetredline/check_model.py
 CHECKMODEL_DEST := skill/scripts/check_model.py
+BOOTSTRAP_SRC := ../jetredline/skills/jetredline/bootstrap_env.py
+BOOTSTRAP_DEST := skill/bootstrap_env.py
 
-.PHONY: package package-plugin package-all clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle vendor-checkmodel drift-check version-check
+.PHONY: package package-plugin package-all clean install test release check-assets vendor-jetcite vendor-splitmarks vendor-textquality vendor-citestyle vendor-checkmodel vendor-bootstrap drift-check version-check
 .PHONY: build-skill build-plugin
 
 # Public targets clean first, then delegate. package-all cleans once so the
@@ -128,6 +130,11 @@ vendor-citestyle:
 # The Opus-class model gate. Canonical copy lives in jetredline; every string
 # in it is skill-agnostic so the copies stay byte-identical, which is what lets
 # jetredline's test suite stand as this one's coverage too.
+vendor-bootstrap:
+	@test -f $(BOOTSTRAP_SRC) || (echo "FAIL: bootstrap_env source not found at $(BOOTSTRAP_SRC)" && exit 1)
+	cp $(BOOTSTRAP_SRC) $(BOOTSTRAP_DEST)
+	@echo "Vendored bootstrap_env.py from $(BOOTSTRAP_SRC)"
+
 vendor-checkmodel:
 	@test -f $(CHECKMODEL_SRC) || (echo "FAIL: check_model source not found at $(CHECKMODEL_SRC)" && exit 1)
 	cp $(CHECKMODEL_SRC) $(CHECKMODEL_DEST)
@@ -159,6 +166,12 @@ drift-check:
 	  echo "check_model: in sync with canonical."; \
 	else \
 	  echo "check_model: canonical repo not present ($(CHECKMODEL_SRC)); skipping drift check."; \
+	fi
+	@if [ -f $(BOOTSTRAP_SRC) ]; then \
+	  cmp -s $(BOOTSTRAP_SRC) $(BOOTSTRAP_DEST) || { echo "DRIFT: $(BOOTSTRAP_DEST) differs from canonical $(BOOTSTRAP_SRC) — run 'make vendor-bootstrap'"; exit 1; }; \
+	  echo "bootstrap_env: in sync with canonical."; \
+	else \
+	  echo "bootstrap_env: canonical repo not present ($(BOOTSTRAP_SRC)); skipping drift check."; \
 	fi
 
 clean:

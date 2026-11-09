@@ -44,43 +44,42 @@ def main():
     # Check dependencies
     warnings = 0
 
-    # Required: pdftotext (Poppler) and pypdf
+    # Required: pdftotext (Poppler)
     if not shutil.which("pdftotext"):
         print("WARNING: pdftotext not found (Poppler)")
         print("  Install with: brew install poppler  (macOS)")
         warnings += 1
 
-    try:
-        subprocess.run(
-            [sys.executable, "-c", "import pypdf"],
-            capture_output=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("WARNING: pypdf Python package not found")
-        print("  Install with: pip install pypdf")
+    # Python packages (pypdf, pdfplumber, python-docx, jetcite's deps) live in
+    # the skill's own venv, built from requirements.txt by bootstrap_env.py.
+    # Build it now so the first memo doesn't pay for it; the skill re-runs the
+    # bootstrap at startup either way, so a failure here is not fatal.
+    venv_python = None
+    r = subprocess.run([sys.executable, str(INSTALL_DIR / "bootstrap_env.py")],
+                       capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        if line.startswith("VENV_PYTHON="):
+            venv_python = line.split("=", 1)[1]
+    if r.returncode == 0 and venv_python:
+        print(f"Python venv ready: {venv_python}")
+    else:
+        print("WARNING: could not build the skill's Python venv now "
+              "(network needed on first build); jetmemo will retry at startup.")
+        if r.stderr.strip():
+            print("  " + r.stderr.strip().splitlines()[-1])
         warnings += 1
 
     # Optional PDF extractors (improve text extraction quality)
-    optional_deps = {
-        "PyMuPDF": ("import fitz", "pip install pymupdf"),
-        "pdfplumber": ("import pdfplumber", "pip install pdfplumber"),
-        "marker": (None, "pip install marker-pdf"),  # checked via CLI
-    }
     optional_missing = []
-    for name, (import_check, install_cmd) in optional_deps.items():
-        if name == "marker":
-            if not shutil.which("marker_single"):
-                optional_missing.append((name, install_cmd))
-        else:
-            try:
-                subprocess.run(
-                    [sys.executable, "-c", import_check],
-                    capture_output=True,
-                    check=True,
-                )
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                optional_missing.append((name, install_cmd))
+    if venv_python:
+        try:
+            subprocess.run([venv_python, "-c", "import fitz"],
+                           capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            optional_missing.append(
+                ("PyMuPDF", f"{venv_python} -m pip install pymupdf"))
+    if not shutil.which("marker_single"):
+        optional_missing.append(("marker", "pip install marker-pdf  (CLI on PATH)"))
 
     if optional_missing:
         print(f"\nOptional PDF extractors not found (text extraction will still work):")

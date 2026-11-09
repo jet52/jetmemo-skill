@@ -23,19 +23,19 @@ how any case should or will be decided. It is not legal advice.
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) installed
 - An **Opus-class model** (Opus, Fable, or Mythos). jetmemo checks at startup and asks you to confirm before running on Sonnet or Haiku — the pipeline delegates all of its reading to subagents that inherit your model, so a weaker reader's miss surfaces nowhere downstream. Switch with `/model opus`.
-- `pypdf` — PDF processing library (`pip install pypdf`)
+- Python 3.9+ and `pdftotext` (Poppler). jetmemo's Python packages (`pypdf`, `pdfplumber`, `python-docx`, and jetcite's dependencies) are **not** installed system-wide: the skill builds its own virtual environment from `skill/requirements.txt` on first use (`bootstrap_env.py`, about 10 seconds, needs network once), keyed to the skill version.
 - An MCP legal-research source (see [Legal Research Sources](#legal-research-sources) below) — not strictly required, but citation verification is much weaker without one
 
 ### Optional PDF extractors
 
-`extract_text.py` tries multiple extractors in priority order and picks the best result. Only `pypdf` is required; the others improve extraction quality for difficult PDFs:
+`extract_text.py` tries multiple extractors in priority order and picks the best result. `pypdf` and `pdfplumber` come with the skill's venv; the others improve extraction quality for difficult PDFs:
 
 | Extractor | Install | Notes |
 |-----------|---------|-------|
 | pdftotext | `brew install poppler` | Fast, often best for native-text PDFs |
-| pypdf | `pip install pypdf` | **Required.** Pure Python fallback |
-| PyMuPDF | `pip install pymupdf` | Good quality, fast |
-| pdfplumber | `pip install pdfplumber` | Useful for table-heavy documents |
+| pypdf | (skill venv) | **Required.** Pure Python fallback |
+| PyMuPDF | `<venv python> -m pip install pymupdf` | Good quality, fast. Must go into the skill venv (`bootstrap_env.py` prints its path) |
+| pdfplumber | (skill venv) | Useful for table-heavy documents |
 | marker | `pip install marker-pdf` | ML-based OCR for scanned/image PDFs (slow) |
 
 ## Installation
@@ -223,7 +223,7 @@ folder picker is auto-detected and symlinked at startup.
 
 | Dependency | Purpose | Required? |
 |-----------|---------|-----------|
-| pypdf | PDF text extraction and packet splitting | Required |
+| pypdf, pdfplumber, python-docx | PDF extraction, packet splitting, .docx output | Required; installed into the skill venv automatically |
 | [jetcite](https://github.com/jet52/jetcite) v2.10.3 | Citation extraction and URL resolution | Bundled |
 | [ndlaw](https://ndlaw.org) | ND primary law — cases, statutes, rules, constitution, admin code | Strongly recommended |
 | [CourtListener MCP](https://www.courtlistener.com/) | Non-ND case law | Recommended |
