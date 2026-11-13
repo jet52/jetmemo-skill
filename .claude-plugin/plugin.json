@@ -1,6 +1,6 @@
 {
   "name": "jetmemo",
-  "version": "3.18.2",
+  "version": "3.19.0",
   "description": "Generate North Dakota Supreme Court bench memos from publicly filed appellate briefs and record documents.",
   "author": {
     "name": "JET"
