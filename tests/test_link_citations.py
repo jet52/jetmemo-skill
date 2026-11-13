@@ -82,3 +82,24 @@ if __name__ == "__main__":
         if name.startswith("test_"):
             fn()
             print("ok", name)
+
+
+def test_id_with_unparsed_antecedent_skipped_with_accurate_reason():
+    memo = "Appellant disagrees (At. Br. 4, ¶ 9). Id. at 5."
+    e = _id("Id.", memo, parent=None, unparsed_antecedent="brief")
+    e["url"] = None
+    out, skipped = link_id_cites(memo, [e])
+    assert out == memo
+    assert len(skipped) == 1 and "brief cite" in skipped[0]
+
+
+def test_verify_citations_notes_id_after_brief_cite(tmp_path):
+    from verify_citations import scan_citations
+    text = ("Smith v. Jones, 2024 ND 1, ¶ 4, 1 N.W.3d 1. "
+            "Appellant disagrees (Appellant Br. at 4). Id. at 5.")
+    entries = scan_citations(text, refs_dir=str(tmp_path))
+    pin = next(e for e in entries
+               if e["cite_type"] == "pin_cite" and e["cite_text"].startswith("Id."))
+    assert pin["unparsed_antecedent"] == "brief"
+    assert "pin_note" in pin and "pin_warning" not in pin
+

@@ -250,6 +250,9 @@ def link_id_cites(markdown: str, memo_entries: list[dict]) -> tuple[str, list[st
             where = f"offset {pos} ({text!r})"
             if markdown[pos:end] != text:
                 skipped.append(f"{where}: offset does not match the memo text")
+            elif e.get("unparsed_antecedent"):
+                skipped.append(f"{where}: follows a {e['unparsed_antecedent']} "
+                               "cite, not an authority")
             elif not e.get("url") or not e.get("parent_normalized") or e.get("pin_warning"):
                 skipped.append(f"{where}: unresolved antecedent")
             elif chain_blocked or _UNPARSED_CITE_RE.search(markdown[prev_end:pos]):
