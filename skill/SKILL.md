@@ -1088,9 +1088,12 @@ for e in brief + memo:
 json.dump(list(merged.values()), open('merged_citations.json','w'), indent=2)
 "
 
-# Link with the enriched set
-$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/link_citations.py" {memo_file} merged_citations.json
+# Link with the enriched set. The third argument is the memo's own scan: it
+# is what lets each Id. be linked to its own antecedent.
+$VENV_PYTHON "${CLAUDE_SKILL_DIR}/scripts/link_citations.py" {memo_file} merged_citations.json memo_citations.json
 ```
+
+**`Id.` citations.** `Id.` names no authority of its own, so it is never linked from the merged text map (an `Id.` in a brief says nothing about an `Id.` in the memo). Each `Id.` jetcite resolved in the memo's own scan is linked at its own offset instead, with only the `Id.` token inside the link. The script prints to stderr every `Id.` it declined to link and why: unresolved antecedent, an intervening brief/record/transcript cite (an `Id.` to a brief is itself improper — see `nd-citation-style.md`), or a `¶` pin whose antecedent is not a paragraph-numbered opinion. **Relay that list in the Step 10 report** — each entry is a citation to check, not noise. `memo_citations.json` must be the scan of the memo *as it stands when the linker runs*; rescan if the memo was edited in between.
 
 `link_citations.py` (version ≥ 2) automatically derives short-form aliases:
 - Any linked `N.D.R.{Set}.P. {N}` registers `Rule {N}` as an alias (skipped if ambiguous across rule sets).

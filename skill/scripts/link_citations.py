@@ -2,11 +2,16 @@
 """Post-process memo markdown to hyperlink citations using URLs from citations.json.
 
 Usage:
-    python3 link_citations.py memo.md citations.json
+    python3 link_citations.py memo.md citations.json [memo_citations.json]
 
 Modifies memo.md in place, wrapping bare citation text with markdown links
 using the URLs from citations.json. Already-linked text (inside markdown
 link syntax) is left untouched.
+
+The optional third argument is a jetcite scan of the memo itself (never of a
+brief), taken before any authority link was inserted. When given, each "Id."
+the scan resolved is linked at its own offset; the ones that could not be
+linked safely are listed on stderr for the author to check.
 """
 
 import json
@@ -42,10 +47,19 @@ def _build_cite_map(citations: list[dict]) -> dict[str, str]:
         # and linked only in list position by _link_list_members.
         if _BARE_NUMBER_ONLY_RE.match(text):
             continue
+        # "Id." / "Ibid." name no authority of their own: the URL jetcite
+        # resolved belongs to one occurrence's antecedent, so a text -> URL
+        # map cannot link them. (Trimmed to "id", the key also matched inside
+        # "said", "did", "valid".)
+        if _CONTEXT_DEPENDENT_RE.match(text):
+            continue
         if text not in seen:
             seen[text] = url
     return seen
 
+
+# Short forms whose target depends on what precedes them in the document.
+_CONTEXT_DEPENDENT_RE = re.compile(r"^[*_]*(?:id|ibid)\b", re.IGNORECASE)
 
 # A citation that is nothing but a provision number, with no authority marker.
 _BARE_NUMBER_ONLY_RE = re.compile(r"^[\d.]+(?:-[\d.]+)+$")
@@ -64,6 +78,8 @@ def _escape_for_regex(text: str) -> str:
     "Rule 52" and "N.D.R.Juv.P. 5" does not match inside "N.D.R.Juv.P. 52".
     """
     pattern = re.escape(text)
+    if text and text[0].isalnum():
+        pattern = r"(?<![A-Za-z0-9])" + pattern
     if text and text[-1].isalnum():
         pattern += r"(?![A-Za-z0-9])"
     return pattern
@@ -193,6 +209,74 @@ def _inside_markdown_link(markdown: str, start: int) -> bool:
     return False
 
 
+# ---------------------------------------------------------------------------
+# Id. citations (position-based)
+# ---------------------------------------------------------------------------
+# "Id." names no authority of its own, so it cannot go through the text -> URL
+# map. jetcite resolves each occurrence to its antecedent and reports the
+# character offset; this pass links exactly those occurrences. It must run on
+# the same text jetcite scanned (the memo before any authority links are
+# inserted), and it takes entries from a scan of the memo only -- an "Id."
+# found in a brief says nothing about any "Id." in the memo.
+
+# Medium-neutral cite ("2024 ND 180", "2005 ND App 8", "2019 WY 84").
+_NEUTRAL_CITE_RE = re.compile(r"^\d{4} [A-Z]{2,5}(?: App)? \d+$")
+
+_ID_TOKEN_RE = re.compile(r"^([*_]?)(ibid|id)\.([*_]?)", re.IGNORECASE)
+
+# Cites jetcite does not parse. One of these between the resolved antecedent
+# and the Id. means the Id. points at a brief or the record (which the ND
+# supplement forbids for briefs), not at the authority jetcite found.
+_UNPARSED_CITE_RE = re.compile(
+    r"\b(?:At|Ae|Pet|Resp|Amicus)\.\s+(?:Reply\s+|Supp\.\s+)?Br\."
+    r"|(?<![\w/])R\d{1,4}(?::|\b)"
+    r"|\bTr\.\s"
+)
+
+
+def link_id_cites(markdown: str, memo_entries: list[dict]) -> tuple[str, list[str]]:
+    """Link each resolved Id. at its own offset. Returns (markdown, skipped notes)."""
+    ordered = sorted((e for e in memo_entries if isinstance(e.get("position"), int)),
+                     key=lambda e: e["position"])
+    edits: list[tuple[int, int, str]] = []
+    skipped: list[str] = []
+    prev_end = 0
+    chain_blocked = False
+    for e in ordered:
+        text, pos = e.get("cite_text", ""), e["position"]
+        end = pos + len(text)
+        m = _ID_TOKEN_RE.match(text) if e.get("cite_type") == "pin_cite" else None
+        if m:
+            where = f"offset {pos} ({text!r})"
+            if markdown[pos:end] != text:
+                skipped.append(f"{where}: offset does not match the memo text")
+            elif not e.get("url") or not e.get("parent_normalized") or e.get("pin_warning"):
+                skipped.append(f"{where}: unresolved antecedent")
+            elif chain_blocked or _UNPARSED_CITE_RE.search(markdown[prev_end:pos]):
+                # An Id. chained off a blocked Id. shares its real antecedent.
+                chain_blocked = True
+                skipped.append(f"{where}: follows a brief or record cite, "
+                               f"not {e['parent_normalized']}")
+            elif e.get("pin_paragraph") and not e.get("pinpoint_inherited") \
+                    and not _NEUTRAL_CITE_RE.match(e["parent_normalized"]):
+                skipped.append(f"{where}: paragraph pin but antecedent "
+                               f"{e['parent_normalized']} is not a "
+                               f"paragraph-numbered opinion")
+            elif not _inside_markdown_link(markdown, pos):
+                # Emphasis markers stay outside the link: memo_to_docx
+                # renders a link inside italics, not italics inside a link.
+                tok = m.group(0)
+                core = tok[len(m.group(1)):len(tok) - len(m.group(3))]
+                edits.append((pos, pos + len(tok),
+                              f"{m.group(1)}[{core}]({e['url']}){m.group(3)}"))
+        else:
+            chain_blocked = False
+        prev_end = max(prev_end, end)
+    for start, stop, repl in sorted(edits, reverse=True):
+        markdown = markdown[:start] + repl + markdown[stop:]
+    return markdown, skipped
+
+
 def link_citations(markdown: str, citations: list[dict]) -> str:
     """Replace bare citation text in markdown with [cite_text](url) links.
 
@@ -248,8 +332,9 @@ def link_citations(markdown: str, citations: list[dict]) -> str:
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <memo.md> <citations.json>", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(f"Usage: {sys.argv[0]} <memo.md> <citations.json> "
+              f"[memo_citations.json]", file=sys.stderr)
         sys.exit(1)
 
     memo_path = Path(sys.argv[1])
@@ -265,7 +350,20 @@ def main():
     markdown = memo_path.read_text(encoding="utf-8")
     citations = json.loads(cite_path.read_text(encoding="utf-8"))
 
-    result = link_citations(markdown, citations)
+    # Id. cites first: their offsets refer to the text as scanned, so they
+    # must be placed before the map pass inserts any markup.
+    result = markdown
+    id_skipped: list[str] = []
+    if len(sys.argv) == 4:
+        memo_cite_path = Path(sys.argv[3])
+        if not memo_cite_path.exists():
+            print(f"Error: memo citations file not found: {memo_cite_path}",
+                  file=sys.stderr)
+            sys.exit(1)
+        memo_entries = json.loads(memo_cite_path.read_text(encoding="utf-8"))
+        result, id_skipped = link_id_cites(result, memo_entries)
+
+    result = link_citations(result, citations)
 
     memo_path.write_text(result, encoding="utf-8")
 
@@ -274,6 +372,10 @@ def main():
     new_links = len(re.findall(r"\[[^\]]+\]\([^)]+\)", result))
     added = new_links - original_links
     print(f"Linked {added} citation(s) in {memo_path.name}")
+    if id_skipped:
+        print(f"{len(id_skipped)} Id. cite(s) left unlinked:", file=sys.stderr)
+        for note in id_skipped:
+            print(f"  {note}", file=sys.stderr)
 
 
 if __name__ == "__main__":
