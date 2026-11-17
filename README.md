@@ -145,6 +145,7 @@ jetmemo-skill/
         ├── ensure_refs.py    ← auto-detects Cowork mounted refs
         ├── extract_text.py   ← multi-library PDF text extraction
         ├── link_citations.py
+        ├── md_tidy.py        ← blank lines around lists/headings/tables (Step 10)
         ├── memo_to_docx.py
         ├── provenance.py     ← model/version/date stamp on the finished memo
         ├── splitmarks.py     ← record-packet splitter (v2.2.0)
