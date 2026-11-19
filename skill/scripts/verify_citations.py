@@ -6,7 +6,10 @@ Usage:
     python3 verify_citations.py --file memo.md --json
     echo "2024 ND 156" | python3 verify_citations.py
 
-Output: structured citation data with local paths, URLs, and search hints.
+Output: structured citation data with source URLs and search hints. The
+checker parses and builds URLs only: it reads no local reference files and
+fetches nothing. Verification happens downstream (ndlaw MCP, CourtListener
+MCP, or WebFetch on the URL).
 """
 
 import argparse
@@ -52,33 +55,24 @@ except ImportError as e:
 # Public API
 # ---------------------------------------------------------------------------
 
-def scan_citations(text: str, refs_dir: str = "~/refs",
-                   include_pin_cites: bool = True,
-                   cache_missing: bool = False) -> list[dict]:
+def scan_citations(text: str, include_pin_cites: bool = True) -> list[dict]:
     """Scan text for all citations. Returns legacy-format dicts.
 
     Pin-cite short forms ("491 F.3d at 363", "Goss at 365", "Id. ¶ 14")
     appear as entries with cite_type "pin_cite", linked to their parent full
     cite via parent_normalized (None = unresolved — likely a drafting error).
-    Pin entries never carry their own local file; verification reads the
-    parent's cached opinion (parent_local_path / parent_local_exists).
+    Pin entries carry no source of their own; verification reads the parent
+    authority, located through the parent entry.
 
-    If cache_missing is True, case citations without a local refs file are
-    fetched from their web source and cached to refs_dir (opinions are
-    permanent content — cached once, read locally forever after). Agent D
-    then reads local markdown instead of fetching at runtime. Pre-populated
-    refs content (NDCC, rules) is never overwritten: statutes and rules are
-    curated locally, and fetch_and_cache skips existing files. Failures are
-    logged and skipped — the entry stays web-only, same as without the flag.
+    Nothing is read from or written to disk, and nothing is fetched: each
+    entry carries the URL of its online source, and the agents that verify
+    the citation retrieve the text themselves (ndlaw MCP for North Dakota
+    authority, the CourtListener MCP or WebFetch on the URL otherwise).
     """
-    refs = Path(refs_dir).expanduser()
-    citations = scan_text(text, refs_dir=refs, include_pin_cites=include_pin_cites)
+    citations = scan_text(text, include_pin_cites=include_pin_cites)
 
-    entries = [to_legacy_dict(c, refs) for c in citations]
+    entries = [to_legacy_dict(c) for c in citations]
     add_parallel_info(entries, citations)
-
-    if cache_missing:
-        _cache_missing_cases(entries, citations, refs)
 
     mark_redundant_parallels(entries)
     annotate_pin_cites(entries)
@@ -87,49 +81,12 @@ def scan_citations(text: str, refs_dir: str = "~/refs",
     return entries
 
 
-def _cache_missing_cases(entries: list[dict], citations: list, refs: Path) -> None:
-    """Fetch and cache web-only case citations (CASE_TYPES only — pins and
-    non-case authorities are skipped; see scan_citations docstring)."""
-    import time
-
-    from jetcite.cache import fetch_and_cache
-    from jetcite.legacy import CASE_TYPES
-
-    norm_to_cite = {c.normalized: c for c in citations if not c.is_pin_cite}
-    fetched_any = False
-    for entry in entries:
-        if (entry.get("cite_type") not in CASE_TYPES
-                or entry.get("local_exists")
-                or not entry.get("url")):
-            continue
-        cite = norm_to_cite.get(entry["normalized"])
-        if cite is None:
-            continue
-        if fetched_any:
-            time.sleep(0.5)  # politeness toward free public services
-        fetched_any = True
-        try:
-            cached = fetch_and_cache(cite, refs_dir=refs, timeout=15.0)
-        except Exception as exc:  # network errors must never fail the scan
-            print(f"  cache: {entry['normalized']} failed ({exc})",
-                  file=sys.stderr)
-            continue
-        if cached is not None:
-            entry["local_path"] = str(cached)
-            entry["local_exists"] = True
-        else:
-            print(f"  cache: {entry['normalized']} not available",
-                  file=sys.stderr)
-
-
 def _primary_of_pair(a: dict, b: dict) -> tuple[dict, dict]:
     """Given two parallel citation entries for the same case, pick the primary.
 
-    Preference order: a locally-cached copy, then a neutral citation, then the
-    first entry. Returns (primary, secondary).
+    Preference order: a neutral citation, then the first entry. Returns
+    (primary, secondary).
     """
-    if a.get("local_exists") != b.get("local_exists"):
-        return (a, b) if a.get("local_exists") else (b, a)
     a_neutral = a.get("cite_type") == "neutral_cite"
     b_neutral = b.get("cite_type") == "neutral_cite"
     if a_neutral != b_neutral:
@@ -206,41 +163,31 @@ def annotate_splice_suspects(entries: list[dict], text: str) -> None:
 
 
 def annotate_pin_cites(entries: list[dict]) -> None:
-    """Attach parent context to pin-cite entries.
+    """Annotate pin-cite entries that have no parent to verify against.
 
-    Pin cites carry no local file of their own; Agent D verifies the pin
-    page/paragraph against the parent's cached opinion, so each resolved pin
-    gets ``parent_local_path``/``parent_local_exists`` copied from its parent
-    entry. Unresolved pins (explicit short form with no matching earlier full
-    cite — e.g. a digit-transposed volume) get ``pin_warning`` so the
-    orchestrator surfaces them as defects.
+    A resolved pin needs nothing added: Agents D and E verify the pin
+    page/paragraph against the parent authority, which they find through
+    ``parent_normalized``. Unresolved pins (explicit short form with no
+    matching earlier full cite — e.g. a digit-transposed volume) get
+    ``pin_warning`` so the orchestrator surfaces them as defects.
     """
-    by_norm = {}
-    for e in entries:
-        if e["cite_type"] != "pin_cite":
-            by_norm.setdefault(e["normalized"], e)
     for e in entries:
         if e["cite_type"] != "pin_cite":
             continue
-        parent_norm = e.get("parent_normalized")
-        if parent_norm is None:
-            unparsed = e.get("unparsed_antecedent")
-            if unparsed:
-                # Id. after a brief/record/transcript cite: correct usage,
-                # just not an authority jetcite parses. A note, not a defect.
-                e["pin_note"] = (
-                    f"Id. refers to the preceding {unparsed} citation; "
-                    "not a parsed authority, nothing to verify"
-                )
-            else:
-                e["pin_warning"] = (
-                    "unresolved short form: no earlier full citation matches"
-                )
+        if e.get("parent_normalized") is not None:
             continue
-        parent = by_norm.get(parent_norm)
-        if parent is not None:
-            e["parent_local_path"] = parent.get("local_path")
-            e["parent_local_exists"] = parent.get("local_exists", False)
+        unparsed = e.get("unparsed_antecedent")
+        if unparsed:
+            # Id. after a brief/record/transcript cite: correct usage,
+            # just not an authority jetcite parses. A note, not a defect.
+            e["pin_note"] = (
+                f"Id. refers to the preceding {unparsed} citation; "
+                "not a parsed authority, nothing to verify"
+            )
+        else:
+            e["pin_warning"] = (
+                "unresolved short form: no earlier full citation matches"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -249,21 +196,15 @@ def annotate_pin_cites(entries: list[dict]) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Parse legal citations, resolve local files, build URLs."
+        description="Parse legal citations and build source URLs."
     )
     parser.add_argument("--file", "-f", help="Scan a file for all citations")
-    parser.add_argument("--refs-dir", default="~/refs",
-                        help="Override refs directory (default: ~/refs)")
     parser.add_argument("--json", action="store_true", default=False,
                         help="Output as JSON")
     parser.add_argument("--pin-cites", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Include pin-cite short forms linked to their "
                              "parent cites (default: on; --no-pin-cites to disable)")
-    parser.add_argument("--cache", action="store_true", default=False,
-                        help="Fetch and cache web-only case citations to the "
-                             "refs directory (opinions are permanent; cached "
-                             "once, read locally thereafter)")
     args = parser.parse_args()
 
     if args.file:
@@ -275,24 +216,21 @@ def main():
     else:
         text = sys.stdin.read()
 
-    results = scan_citations(text, refs_dir=args.refs_dir,
-                             include_pin_cites=args.pin_cites,
-                             cache_missing=args.cache)
+    results = scan_citations(text, include_pin_cites=args.pin_cites)
 
     if args.json:
         print(json.dumps(results, indent=2, ensure_ascii=False))
     else:
         pins = [r for r in results if r["cite_type"] == "pin_cite"]
         fulls = [r for r in results if r["cite_type"] != "pin_cite"]
-        local = sum(1 for r in fulls if r.get("local_exists"))
-        web = sum(1 for r in fulls if r.get("url") and not r.get("local_exists"))
-        unresolved = sum(1 for r in fulls if not r.get("local_exists") and not r.get("url"))
+        with_url = sum(1 for r in fulls if r.get("url"))
+        unresolved = len(fulls) - with_url
         redundant = sum(1 for r in fulls if r.get("redundant_parallel"))
         pin_warnings = sum(1 for r in pins if r.get("pin_warning"))
 
         print(f"\nCitation Scan Results")
         print(f"{'=' * 40}")
-        summary = f"Total: {len(fulls)} | Local: {local} | Web only: {web} | Unresolved: {unresolved}"
+        summary = f"Total: {len(fulls)} | URL: {with_url} | Unresolved: {unresolved}"
         if redundant:
             summary += f" | Parallel dups: {redundant}"
         if pins:
@@ -308,7 +246,7 @@ def main():
         for ctype, cites in sorted(by_type.items()):
             print(f"\n{ctype.upper()} ({len(cites)}):")
             for r in cites:
-                status = "local" if r.get("local_exists") else ("url" if r.get("url") else "???")
+                status = "url" if r.get("url") else "???"
                 ante = r.get("antecedent_name")
                 label = f"{ante}, {r['normalized']}" if ante else r["normalized"]
                 if r.get("redundant_parallel"):
@@ -323,8 +261,7 @@ def main():
                 elif r.get("pin_note"):
                     print(f"  [note ] {r['normalized']}  {r['pin_note']}")
                 else:
-                    where = "parent local" if r.get("parent_local_exists") else "parent url"
-                    print(f"  [{'ok':5s}] {r['normalized']}  → {r['parent_normalized']} ({where})")
+                    print(f"  [{'ok':5s}] {r['normalized']}  → {r['parent_normalized']}")
 
 
 if __name__ == "__main__":

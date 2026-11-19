@@ -65,7 +65,7 @@ them single-dispatch so the comparison never changes what ships.
    is, or that another arm exists. A subagent that knows it is being graded is
    not measuring what you want.
 3. **Same tools, same resources.** Identical `subagent_type`; same MCP
-   availability; same `~/refs`. Do not vary effort settings between arms — model
+   availability. Do not vary effort settings between arms — model
    is the only variable.
 4. **Description tag.** Every dispatched `Agent` call sets
    `description: "cmp <slot> <arm>"` — e.g. `cmp A opus`, `cmp A opus2`,
@@ -186,7 +186,7 @@ Give the judge the rubric for the slot being scored.
 **D — precedent lookup**
 - **Verification correctness** — the Supports / Partially / Does not support
   verdict matches what the cited paragraph actually holds.
-- **Source discipline** — MCP or local file tried before the web for ND cites;
+- **Source discipline** — ndlaw MCP tried before the web for ND cites;
   the Lookup Methods tally matches the Source column.
 - **Repair handling** — splice-suspect and pin-cite entries handled per the
   prompt; no cite declared nonexistent without attempting the repair.

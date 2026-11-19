@@ -93,11 +93,11 @@ def test_id_with_unparsed_antecedent_skipped_with_accurate_reason():
     assert len(skipped) == 1 and "brief cite" in skipped[0]
 
 
-def test_verify_citations_notes_id_after_brief_cite(tmp_path):
+def test_verify_citations_notes_id_after_brief_cite():
     from verify_citations import scan_citations
     text = ("Smith v. Jones, 2024 ND 1, ¶ 4, 1 N.W.3d 1. "
             "Appellant disagrees (Appellant Br. at 4). Id. at 5.")
-    entries = scan_citations(text, refs_dir=str(tmp_path))
+    entries = scan_citations(text)
     pin = next(e for e in entries
                if e["cite_type"] == "pin_cite" and e["cite_text"].startswith("Id."))
     assert pin["unparsed_antecedent"] == "brief"

@@ -10,14 +10,6 @@ SKILL_NAME = "jetmemo"
 SCRIPT_DIR = Path(__file__).resolve().parent
 INSTALL_DIR = Path.home() / ".claude" / "skills" / SKILL_NAME
 
-REF_DIRS = {
-    "opin": "Court opinions (by reporter)",
-    "statute/NDCC": "North Dakota Century Code",
-    "reg/NDAC": "North Dakota Administrative Code",
-    "rule": "Court rules",
-    "cnst": "Constitutions",
-}
-
 
 def main():
     version_file = SCRIPT_DIR / "VERSION"
@@ -85,13 +77,6 @@ def main():
         print(f"\nOptional PDF extractors not found (text extraction will still work):")
         for name, install_cmd in optional_missing:
             print(f"  {name}: {install_cmd}")
-
-    refs_dir = Path.home() / "refs"
-    for name, description in REF_DIRS.items():
-        if not (refs_dir / name).is_dir():
-            print(f"WARNING: ~/refs/{name}/ not found")
-            print(f"  This directory should contain {description}.")
-            warnings += 1
 
     if warnings:
         print(f"\n{warnings} warning(s). The skill will work but some features may be limited.")

@@ -100,7 +100,7 @@ cp -r skill/* ~/.claude/skills/jetmemo/
 2. Go to Project Knowledge
 3. Upload the contents of `skill/SKILL.md` as a project knowledge file
 
-Note: The web version cannot execute scripts or access local reference files. It will produce memos using only the documents you upload to the conversation.
+Note: The web version cannot execute scripts. It will produce memos using only the documents you upload to the conversation.
 
 ## Usage
 
@@ -130,7 +130,7 @@ jetmemo-skill/
     │       ├── models.py     ← citation data models
     │       ├── scanner.py    ← regex-based citation extraction
     │       ├── resolver.py   ← URL resolution engine
-    │       ├── cache.py      ← disk cache for resolved URLs
+    │       ├── fetch.py      ← fetches a cited authority's text into memory
     │       ├── patterns/     ← citation patterns by jurisdiction
     │       └── sources/      ← URL source modules (ndcourts, courtlistener, etc.)
     ├── references/
@@ -142,7 +142,6 @@ jetmemo-skill/
         ├── check_model.py    ← Opus-class model gate (Step 0.0)
         ├── check_update.py
         ├── compare_agents.py
-        ├── ensure_refs.py    ← auto-detects Cowork mounted refs
         ├── extract_text.py   ← multi-library PDF text extraction
         ├── link_citations.py
         ├── md_tidy.py        ← blank lines around lists/headings/tables (Step 10)
@@ -204,10 +203,10 @@ material is visible in the finished memo rather than silent.
 Constitution — have no MCP tier, since CourtListener indexes case law rather than
 codes. Those resolve at tier 3 by web fetch to the official source.
 
-> **Optional local cache.** If a `~/refs/` tree exists, the skill will read from it
-> and `verify_citations.py --cache` will grow it as it goes. It is no longer part of
-> setup: ndlaw supersedes it for ND material and is strictly better. Its remaining
-> use is offline or egress-blocked operation.
+> **No local cache.** The skill reads no `~/refs/` tree and writes nothing to one.
+> Earlier versions kept a local reference cache there; it is gone, along with
+> `verify_citations.py --refs-dir` and `--cache`. Authority is read at run time
+> from the tiers above.
 
 ### Cowork (sandboxed environments)
 
@@ -217,8 +216,7 @@ If you rely on web fallbacks instead, Cowork blocks outbound access by default. 
 the domains listed in [`skill/lib/jetcite/NETWORK.md`](skill/lib/jetcite/NETWORK.md)
 to the egress allowlist (sandbox settings → **Allow network egress** → **Additional
 allowed domains**), then start a new session. Without this, citations resolve to a
-search URL rather than the direct source. A `~/refs` folder mounted via the Cowork
-folder picker is auto-detected and symlinked at startup.
+search URL rather than the direct source.
 
 ## Other Dependencies
 
