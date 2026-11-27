@@ -146,6 +146,8 @@ python3 -m venv /tmp/jetmemo-venv
 
    **First, check whether the records already arrived split.** The `record-fetch` tool splits packets into per-document files by default, named `R{idx} - {DocumentName}.pdf` (e.g., `R38 - Order.pdf`). If the working directory already contains a set of such per-document files (filenames beginning with `R` followed by a number), the record is **already split** — skip splitmarks for those and classify them directly. Splitting is only a fallback for records that arrive as an un-split combined PDF (e.g., a clerk-emailed packet or a brief's appendix).
 
+   **Record numbers are not zero-padded, so a prefix glob over-matches.** `R2*` matches R2 and R20–R29; `R3*.txt` matches R3 and R30–R39. Concatenating such a glob silently mixes other filings into what looks like one document's text, and reads as corruption. Select a record item by its full prefix including the separator, `"R2 - "*`, or by its exact filename from the manifest. Never `cat R2*`, `ls R3*`, or the like.
+
    For any PDF over ~30 pages that looks like a combined record or appendix, split recursively until each output file represents a single record item (e.g., R2, R7, R36):
 
    ```bash
@@ -321,7 +323,7 @@ Two MCP servers are the primary source for authority lookup and verification. **
 
 Launch all applicable agents **simultaneously** using the Task tool (`subagent_type: general-purpose`). Each agent gets:
 
-- Paths to relevant `.txt` files (or PDF paths if `needs_visual_read`)
+- Paths to relevant `.txt` files (or PDF paths if `needs_visual_read`), each as its **exact filename** from the manifest — never a glob or a bare record number. If an agent must find record items itself, tell it to match `"R{n} - "*`, not `R{n}*` (see Step 0, item 3)
 - Focused extraction instructions
 - Expected output format (structured markdown)
 - The literal `VENV_PYTHON` path, if the agent may run any of this skill's scripts (see Step 0, **Python environment**)
