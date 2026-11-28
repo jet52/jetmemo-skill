@@ -38,7 +38,10 @@ def _build_cite_map(citations: list[dict]) -> dict[str, str]:
     for entry in citations:
         text = _normalize_dashes(entry.get("cite_text", "").strip())
         text = text.rstrip(",;.:")
-        url = entry.get("url")
+        # text_link_url: the reader's link (official, or ndlaw.org under
+        # JETCITE_PREFER=ndlaw) that holds for EVERY appearance of this text;
+        # "url" is the fetchable source, and the fallback for older entries
+        url = entry.get("text_link_url") or entry.get("url")
         if not text or not url:
             continue
         # A bare provision number ("11-11-43") is what jetcite returns for a
@@ -167,7 +170,7 @@ def _list_member_aliases(citations: list[dict]) -> dict[str, str]:
     by_number: dict[str, set[str]] = {}
     for entry in citations:
         text = _normalize_dashes(entry.get("cite_text", "").strip()).rstrip(",;.:")
-        url = entry.get("url")
+        url = entry.get("text_link_url") or entry.get("url")
         if not text or not url:
             continue
         m = _NUMBER_IN_CITE_RE.match(text)
@@ -270,8 +273,10 @@ def link_id_cites(markdown: str, memo_entries: list[dict]) -> tuple[str, list[st
                 # renders a link inside italics, not italics inside a link.
                 tok = m.group(0)
                 core = tok[len(m.group(1)):len(tok) - len(m.group(3))]
+                # this occurrence's own link, pinpoint included
+                link = e.get("link_url") or e["url"]
                 edits.append((pos, pos + len(tok),
-                              f"{m.group(1)}[{core}]({e['url']}){m.group(3)}"))
+                              f"{m.group(1)}[{core}]({link}){m.group(3)}"))
         else:
             chain_blocked = False
         prev_end = max(prev_end, end)

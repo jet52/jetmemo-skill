@@ -1064,6 +1064,8 @@ Subsection references (e.g., `Rule 9(a)(3)`, `§ 27-19.1-01(5)`) are linked at t
 
 Citations already inside markdown links are left untouched. If `citations.json` does not exist (e.g., citation extraction was skipped), skip this step.
 
+**Link destination.** Links go to the official sites (ndcourts.gov, ndlegis.gov) by default. With `JETCITE_PREFER=ndlaw` in the environment, ND opinions, court rules, N.D.C.C., and N.D.A.C. citations link to `https://ndlaw.org/cite/{citation}` instead, which opens at the pinpoint (`¶ 17`, a reporter page, a rule subdivision); each ndlaw.org page links to its official source. The variable must be the same for every `verify_citations.py` run whose output feeds the linker. It changes only the links: the `url` field each entry carries stays the official, fetchable source, so never `WebFetch` an ndlaw.org link — use the ndlaw MCP for ND text.
+
 ### Step 8: Generate Word Document
 
 Convert the markdown memo to a formatted .docx file matching the Court's bench memo template (QTPalatine 13pt, justified, 1.2 line spacing):
